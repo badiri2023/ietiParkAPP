@@ -188,8 +188,12 @@ public class LoginScreen extends ScreenAdapter {
     }
 
     public void irAlJuego() {
-        if (dialogoActual != null) dialogoActual.remove();
-        // game.setScreen(new GameScreen(game, cliente)); // Lo descomentaremos en el siguiente paso
+        // Usamos postRunnable para asegurarnos de que el cambio de pantalla ocurra en el hilo de renderizado
+        Gdx.app.postRunnable(() -> {
+            if (dialogoActual != null) dialogoActual.remove();
+            // Pasamos 'game' para poder cambiar pantallas y 'cliente' para seguir comunicados
+            game.setScreen(new GameScreen(game, cliente));
+        });
     }
 
     public void mostrarDialogoCarga(String titulo, String mensaje) {
