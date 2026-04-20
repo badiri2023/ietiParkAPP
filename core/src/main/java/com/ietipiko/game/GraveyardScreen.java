@@ -29,7 +29,7 @@ public class GraveyardScreen extends ScreenAdapter {
         this.stage = new Stage(new FitViewport(640, 360));
 
         // VINCULACIÓN CRÍTICA: Le decimos al cliente que ahora mande los datos aquí
-        this.cliente.setPantallaGraveyard(this);
+        //this.cliente.setPantallaGraveyard(this);
 
         prepararSkin();
         construirInterfaz();

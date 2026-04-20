@@ -1,6 +1,8 @@
 package com.ietipiko.game;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.utils.JsonReader;
+import com.badlogic.gdx.utils.JsonValue;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import java.net.URI;
@@ -8,68 +10,55 @@ import java.net.URI;
 public class GameClient extends WebSocketClient {
 
     private LoginScreen pantallaLogin;
-    private GraveyardScreen pantallaGraveyard;
-    private String nickname; // Guardamos el nickname
+    private JsonReader jsonReader;
 
-    public GameClient(URI serverUri, LoginScreen pantallaLogin, String nickname) {
+    public GameClient(URI serverUri, LoginScreen pantallaLogin) {
         super(serverUri);
         this.pantallaLogin = pantallaLogin;
-        this.nickname = nickname;
-    }
-
-    public void setPantallaGraveyard(GraveyardScreen pantalla) {
-        this.pantallaGraveyard = pantalla;
+        this.jsonReader = new JsonReader(); // El traductor de LibGDX
     }
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-        System.out.println("Conexión abierta. Enviando JOIN...");
-
-        // Enviamos el mensaje JOIN en formato JSON como espera el servidor Node
-        String joinJson = "{\"type\":\"JOIN\", \"nickname\":\"" + nickname + "\"}";
-        this.send(joinJson);
-
-        Gdx.app.postRunnable(() -> {
-            pantallaLogin.irAlGraveyard(this);
-        });
+        System.out.println("¡Conectado al servidor!");
     }
 
     @Override
     public void onMessage(String message) {
-        System.out.println("Mensaje del server: " + message);
+        try {
+            // 1. Convertimos el texto que llega en un objeto JSON
+            JsonValue json = jsonReader.parse(message);
+            String tipo = json.getString("type");
 
-        // Forma sencilla de detectar la lista de jugadores sin usar una librería JSON compleja todavía.
-        // Tu servidor Node hace: sala.broadcast("PLAYER_LIST", sala.getPlayerList());
-        // Dependiendo de cómo tengas hecho el "broadcast", llegará un JSON.
-        // Asumiendo que el JSON contiene "PLAYER_LIST":
+            // 2. Si el servidor nos manda la lista de jugadores...
+            if (tipo.equals("PLAYER_LIST")) {
+                JsonValue data = json.get("data");
+                String[] nombres = new String[data.size];
 
-        if (message.contains("PLAYER_LIST")) {
-            // Nota: Aquí lo ideal es usar la clase JsonReader de libGDX para leer el JSON real.
-            // Esto es un parche rápido si tu servidor enviase algo plano.
-            // Para leer JSON real en libGDX:
-            // JsonReader reader = new JsonReader();
-            // JsonValue root = reader.parse(message);
-            // Si quieres parsear la lista exacta, adaptaremos esto al JSON de tu server.
-
-            Gdx.app.postRunnable(() -> {
-                if (pantallaGraveyard != null) {
-                    // pantallaGraveyard.actualizarLista(...);
+                for (int i = 0; i < data.size; i++) {
+                    // Extraemos el nickname de cada jugador en la lista
+                    nombres[i] = data.get(i).getString("nickname");
                 }
-            });
+
+                // 3. Actualizamos la interfaz de Android
+                Gdx.app.postRunnable(() -> {
+                    if (pantallaLogin != null) {
+                        pantallaLogin.actualizarLista(nombres);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            System.out.println("Error al leer el mensaje del servidor: " + e.getMessage());
         }
     }
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        System.out.println("Conexión cerrada. Código: " + code + " Razón: " + reason);
+        System.out.println("Conexión cerrada.");
     }
 
     @Override
     public void onError(Exception ex) {
-        Gdx.app.postRunnable(() -> {
-            if (pantallaLogin != null) {
-                pantallaLogin.mostrarDialogo("Error", "No se pudo conectar: " + ex.getMessage());
-            }
-        });
+        System.out.println("Error de red: " + ex.getMessage());
     }
 }

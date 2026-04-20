@@ -11,7 +11,9 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Dialog;
+import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -29,20 +31,28 @@ public class LoginScreen extends ScreenAdapter {
     private Skin skin;
     private Dialog dialogoActual;
 
+    // Variables para la fusión del Lobby
+    private Table tablaJugadores;
+    private GameClient cliente;
+
     public LoginScreen(Game game) {
         this.game = game;
-        stage = new Stage(new FitViewport(640, 360));
+        // Viewport más ancho (800x480) para que quepan las dos columnas cómodamente
+        stage = new Stage(new FitViewport(800, 480));
         Gdx.input.setInputProcessor(stage);
 
         crearEstilos();
         construirInterfaz();
+
+        // Nos conectamos al servidor nada más abrir la app para cargar la lista
+        conectarAlServidorInicial();
     }
 
     private void crearEstilos() {
         skin = new Skin();
         skin.add("default", new BitmapFont());
 
-        // Fondos personalizados
+        // Texturas y colores originales de Picko Skull
         Pixmap pixmapGris = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmapGris.setColor(new Color(0.12f, 0.12f, 0.15f, 1f));
         pixmapGris.fill();
@@ -58,7 +68,7 @@ public class LoginScreen extends ScreenAdapter {
         pixmapBlanco.fill();
         skin.add("blanco", new Texture(pixmapBlanco));
 
-        // Estilos de UI
+        // Estilos de los componentes
         Label.LabelStyle labelStyle = new Label.LabelStyle(skin.getFont("default"), Color.LIGHT_GRAY);
         skin.add("default", labelStyle);
 
@@ -83,9 +93,13 @@ public class LoginScreen extends ScreenAdapter {
     }
 
     private void construirInterfaz() {
-        Table tabla = new Table();
-        tabla.setFillParent(true);
+        Table root = new Table();
+        root.setFillParent(true);
 
+        // ==========================================
+        // SECCIÓN LOGIN (Ahora irá a la derecha)
+        // ==========================================
+        Table ladoLogin = new Table();
         Label titulo = new Label("Picko Skull", skin);
         titulo.setFontScale(1.8f);
 
@@ -98,42 +112,89 @@ public class LoginScreen extends ScreenAdapter {
         btnEntrar.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                String nickname = campoNombre.getText();
-                if (!nickname.trim().isEmpty()) {
-                    conectarAlServidor(nickname);
+                String nickname = campoNombre.getText().trim();
+                if (!nickname.isEmpty()) {
+                    if (cliente != null && cliente.isOpen()) {
+                        mostrarDialogoCarga("Conectando...", "Merging souls...");
+                        // Enviamos el JSON correcto al servidor
+                        cliente.send("{\"type\":\"JOIN\", \"nickname\":\"" + nickname + "\"}");
+                    } else {
+                        conectarAlServidorInicial();
+                    }
                 } else {
                     mostrarDialogo("Aviso", "¡Tu esqueleto necesita un nombre!");
                 }
             }
         });
 
-        tabla.add(titulo).expandY().top().padTop(40).row();
-        tabla.add(campoNombre).width(300).height(40).expandY().center().row();
-        tabla.add(btnEntrar).width(200).height(50).expandY().bottom().padBottom(40);
+        ladoLogin.add(titulo).expandY().top().padTop(40).row();
+        ladoLogin.add(campoNombre).width(300).height(40).expandY().center().row();
+        ladoLogin.add(btnEntrar).width(200).height(50).expandY().bottom().padBottom(40);
 
-        stage.addActor(tabla);
+        // ==========================================
+        // SEPARADOR CENTRAL (Línea Blanca)
+        // ==========================================
+        Image lineaSeparadora = new Image(skin.getDrawable("blanco"));
+
+        // ==========================================
+        // SECCIÓN GRAVEYARD (Ahora irá a la izquierda)
+        // ==========================================
+        Table ladoGraveyard = new Table();
+        ladoGraveyard.top();
+
+        Label subTitulo = new Label("GRAVEYARD", skin);
+        subTitulo.setColor(Color.GRAY);
+        subTitulo.setFontScale(1.3f);
+
+        tablaJugadores = new Table();
+        tablaJugadores.top();
+
+        ladoGraveyard.add(subTitulo).padTop(40).padBottom(20).row();
+        ladoGraveyard.add(new ScrollPane(tablaJugadores)).expand().fill();
+
+        // ==========================================
+        // ENSAMBLAJE FINAL DE LA PANTALLA (Invertido)
+        // ==========================================
+        root.add(ladoGraveyard).expand().fill(); // 1º Graveyard (Izquierda)
+        root.add(lineaSeparadora).width(2).fillY().padTop(20).padBottom(20); // 2º Línea (Centro)
+        root.add(ladoLogin).expand().fill(); // 3º Login (Derecha)
+
+        stage.addActor(root);
     }
 
-    // Añadimos 'String nickname' entre los paréntesis
-    private void conectarAlServidor(String nickname) {
+    private void conectarAlServidorInicial() {
         try {
-            // Recuerda usar ws://10.0.2.2:3000 si estás en el emulador
-            URI uri = new URI("ws://10.0.2.2:3000");
+            // IP correcta para emulador Android apuntando a tu PC.
+            // Si usas PC a PC o Móvil real por WiFi, pon "192.168..." o "10.0.0.X"
+            String ipServidor = "10.0.2.2";
+            String puerto = "3000"; // CORREGIDO: Antes ponía "80803000"
 
-            // ¡Aquí está la magia! Le pasamos el nickname como tercer parámetro
-            GameClient cliente = new GameClient(uri, this, nickname);
-
+            URI uri = new URI("ws://" + ipServidor + ":" + puerto);
+            cliente = new GameClient(uri, this);
             cliente.connect();
-            mostrarDialogoCarga("Conectando...", "Merging souls...");
         } catch (Exception e) {
-            mostrarDialogo("Error Fatal", "La dirección del servidor no es válida.");
+            System.out.println("No se pudo iniciar la conexión automática: " + e.getMessage());
         }
     }
 
-    // --- GESTIÓN DE DIÁLOGOS (POP-UPS) ---
+    // Este método lo llama el GameClient cuando recibe la lista en JSON
+    public void actualizarLista(String[] nombres) {
+        tablaJugadores.clearChildren();
+        for (String nombre : nombres) {
+            Label lblJugador = new Label(nombre, skin);
+            lblJugador.setFontScale(1.1f);
+            tablaJugadores.add(lblJugador).pad(5).row();
+        }
+    }
+
+    public void irAlJuego() {
+        if (dialogoActual != null) dialogoActual.remove();
+        // game.setScreen(new GameScreen(game, cliente)); // Lo descomentaremos en el siguiente paso
+    }
 
     public void mostrarDialogoCarga(String titulo, String mensaje) {
         if (dialogoActual != null) dialogoActual.remove();
+
         dialogoActual = new Dialog(titulo, skin);
         dialogoActual.text(mensaje);
         dialogoActual.getContentTable().pad(50);
@@ -142,6 +203,7 @@ public class LoginScreen extends ScreenAdapter {
 
     public void mostrarDialogo(String titulo, String mensaje) {
         if (dialogoActual != null) dialogoActual.remove();
+
         dialogoActual = new Dialog(titulo, skin) {
             @Override
             protected void result(Object object) {
@@ -153,14 +215,6 @@ public class LoginScreen extends ScreenAdapter {
         dialogoActual.getContentTable().padTop(40).padBottom(20).padLeft(60).padRight(60);
         dialogoActual.getButtonTable().padBottom(20);
         dialogoActual.show(stage);
-    }
-
-    // --- NAVEGACIÓN ---
-
-    public void irAlGraveyard(GameClient cliente) {
-        if (dialogoActual != null) dialogoActual.remove();
-        // Saltamos a la pantalla del cementerio pasando el cliente activo
-        game.setScreen(new GraveyardScreen(game, cliente));
     }
 
     @Override
@@ -180,5 +234,6 @@ public class LoginScreen extends ScreenAdapter {
     public void dispose() {
         stage.dispose();
         skin.dispose();
+        if (cliente != null) cliente.close();
     }
 }
