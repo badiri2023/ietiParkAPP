@@ -10,11 +10,19 @@ import java.net.URI;
 public class GameClient extends WebSocketClient {
 
     private LoginScreen pantallaLogin;
+    // NUEVO: Referencia a la pantalla de juego
+    private GameScreen pantallaJuego;
+
     private JsonReader jsonReader = new JsonReader();
 
     public GameClient(URI serverUri, LoginScreen pantallaLogin) {
         super(serverUri);
         this.pantallaLogin = pantallaLogin;
+    }
+
+    // NUEVO: Método para vincular la pantalla de juego cuando entramos a la partida
+    public void setPantallaJuego(GameScreen pantallaJuego) {
+        this.pantallaJuego = pantallaJuego;
     }
 
     @Override
@@ -30,7 +38,7 @@ public class GameClient extends WebSocketClient {
             String type = json.getString("type");
 
             if (type.equals("WELCOME")) {
-                // ¡ESTA ES LA CLAVE! El servidor nos aceptó.
+                // El servidor nos aceptó, pasamos a GameScreen
                 Gdx.app.postRunnable(() -> {
                     if (pantallaLogin != null) pantallaLogin.irAlJuego();
                 });
@@ -45,13 +53,26 @@ public class GameClient extends WebSocketClient {
                     if (pantallaLogin != null) pantallaLogin.actualizarLista(nombres);
                 });
             }
+            // ==========================================
+            // NUEVO: LEER POSICIONES DURANTE LA PARTIDA
+            // ==========================================
+            else if (type.equals("STATE_UPDATE")) {
+                JsonValue players = json.get("players");
+                // Le pasamos los datos a la pantalla de juego (si ya está creada)
+                if (pantallaJuego != null) {
+                    pantallaJuego.actualizarEstado(players);
+                }
+            }
+
         } catch (Exception e) {
-            System.out.println("Error procesando mensaje: " + message);
+            System.out.println("Error procesando mensaje: " + e.getMessage());
         }
     }
 
     @Override
-    public void onClose(int code, String reason, boolean remote) { }
+    public void onClose(int code, String reason, boolean remote) {
+        System.out.println("Conexión cerrada.");
+    }
 
     @Override
     public void onError(Exception ex) {

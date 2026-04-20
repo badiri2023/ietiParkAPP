@@ -8,12 +8,14 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer; // NUEVO
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
+import com.badlogic.gdx.utils.JsonValue; // NUEVO
 import com.badlogic.gdx.utils.viewport.FitViewport;
 
 public class GameScreen extends ScreenAdapter {
@@ -21,6 +23,10 @@ public class GameScreen extends ScreenAdapter {
     private GameClient cliente;
     private Stage stage;
     private Skin skin;
+
+    // NUEVO: Herramientas para dibujar y guardar datos
+    private ShapeRenderer shapeRenderer;
+    private JsonValue jugadoresActivos;
 
     // Estados de los botones
     private boolean isLeftPressed = false;
@@ -33,8 +39,19 @@ public class GameScreen extends ScreenAdapter {
         this.stage = new Stage(new FitViewport(800, 480));
         Gdx.input.setInputProcessor(stage);
 
+        // NUEVO: Inicializamos el dibujante y nos vinculamos al cliente
+        this.shapeRenderer = new ShapeRenderer();
+        if (this.cliente != null) {
+            this.cliente.setPantallaJuego(this);
+        }
+
         prepararSkin();
         construirInterfaz();
+    }
+
+    // NUEVO: El cliente llamará a este método 30 veces por segundo
+    public void actualizarEstado(JsonValue jugadores) {
+        this.jugadoresActivos = jugadores;
     }
 
     private void prepararSkin() {
@@ -71,13 +88,8 @@ public class GameScreen extends ScreenAdapter {
         configurarBoton(btnRight, "right");
 
         // --- LAYOUT ---
-        // Añadimos SALTO a la izquierda
         table.add(btnJump).size(100, 80).left().pad(20);
-
-        // Espacio expandible en medio para empujar los otros botones a la derecha
         table.add().expandX();
-
-        // Añadimos IZQUIERDA y DERECHA juntos a la derecha
         table.add(btnLeft).size(80, 80).pad(10);
         table.add(btnRight).size(80, 80).pad(10).padRight(20);
 
@@ -109,7 +121,6 @@ public class GameScreen extends ScreenAdapter {
 
     private void enviarInput() {
         if (cliente != null && cliente.isOpen()) {
-            // Enviamos el JSON que espera tu server.js
             String json = "{\"type\":\"INPUT\", \"left\":" + isLeftPressed +
                 ", \"right\":" + isRightPressed +
                 ", \"jump\":" + isJumpPressed + "}";
@@ -122,6 +133,25 @@ public class GameScreen extends ScreenAdapter {
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        // ==========================================
+        // NUEVO: DIBUJAMOS A LOS JUGADORES
+        // ==========================================
+        if (jugadoresActivos != null) {
+            shapeRenderer.setProjectionMatrix(stage.getCamera().combined);
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+            shapeRenderer.setColor(Color.WHITE); // Color del cuadrado temporal
+
+            for (JsonValue jugador : jugadoresActivos) {
+                float x = jugador.getFloat("x");
+                float y = jugador.getFloat("y");
+
+                // Dibujamos un cuadrado de 40x40 píxeles por cada jugador
+                shapeRenderer.rect(x, y, 40, 40);
+            }
+            shapeRenderer.end();
+        }
+
+        // Dibujamos la interfaz (los botones) por encima de los jugadores
         stage.act(delta);
         stage.draw();
     }
@@ -135,5 +165,7 @@ public class GameScreen extends ScreenAdapter {
     public void dispose() {
         stage.dispose();
         skin.dispose();
+        // NUEVO: Liberamos la memoria del dibujante
+        if (shapeRenderer != null) shapeRenderer.dispose();
     }
 }
