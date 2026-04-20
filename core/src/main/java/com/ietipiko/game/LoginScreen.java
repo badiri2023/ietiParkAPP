@@ -31,7 +31,6 @@ public class LoginScreen extends ScreenAdapter {
 
     public LoginScreen(Game game) {
         this.game = game;
-        // Viewport de 640x360 para que todo se vea más grande
         stage = new Stage(new FitViewport(640, 360));
         Gdx.input.setInputProcessor(stage);
 
@@ -101,7 +100,7 @@ public class LoginScreen extends ScreenAdapter {
             public void clicked(InputEvent event, float x, float y) {
                 String nickname = campoNombre.getText();
                 if (!nickname.trim().isEmpty()) {
-                    conectarAlServidor();
+                    conectarAlServidor(nickname);
                 } else {
                     mostrarDialogo("Aviso", "¡Tu esqueleto necesita un nombre!");
                 }
@@ -115,10 +114,15 @@ public class LoginScreen extends ScreenAdapter {
         stage.addActor(tabla);
     }
 
-    private void conectarAlServidor() {
+    // Añadimos 'String nickname' entre los paréntesis
+    private void conectarAlServidor(String nickname) {
         try {
-            URI uri = new URI("ws://localhost:8080");
-            GameClient cliente = new GameClient(uri, this);
+            // Recuerda usar ws://10.0.2.2:3000 si estás en el emulador
+            URI uri = new URI("ws://10.0.2.2:3000");
+
+            // ¡Aquí está la magia! Le pasamos el nickname como tercer parámetro
+            GameClient cliente = new GameClient(uri, this, nickname);
+
             cliente.connect();
             mostrarDialogoCarga("Conectando...", "Merging souls...");
         } catch (Exception e) {
