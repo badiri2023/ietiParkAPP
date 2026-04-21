@@ -42,7 +42,8 @@ public class GameScreen extends ScreenAdapter {
     private boolean isLeftPressed = false;
     private boolean isRightPressed = false;
     private boolean isJumpPressed = false;
-
+    private float puertaX, puertaY, puertaWidth, puertaHeight;
+    private Texture texturaPuerta; // No olvides cargarla en cargarAnimaciones()
     // MAPA
     private MapRender mapRender;
 
@@ -85,7 +86,8 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void cargarAnimaciones() {
-        String[] nombresColores = {"Blanco", "Negro", "Amarillo", "Azul", "Verde", "Rojo", "Turquesa", "Violeta"};
+        // CAMBIO: Todo en minúsculas para coincidir con "colors.js" del servidor
+        String[] nombresColores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
         String[] archivosPng = {
             "media/skeleton_color1.png",
             "media/skeleton_color2.png",
@@ -107,7 +109,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     // =========================================================
-    // MÉTODO NUEVO: Crea un botón transparente y con hitbox circular
+    // Crea un botón transparente y con hitbox circular
     // =========================================================
     private TextButton crearBotonCircular(String texto, Skin skin) {
         TextButton boton = new TextButton(texto, skin) {
@@ -199,20 +201,38 @@ public class GameScreen extends ScreenAdapter {
         }
     }
 
-    public void actualizarEstado(JsonValue playersJson) {
-        jugadoresOnline.clear();
+    // MÉTODO CORREGIDO: Recibe el objeto "data" completo del GameClient
+    public void actualizarEstado(JsonValue data) {
+        if (data == null) return;
 
-        for (JsonValue pJson : playersJson) {
-            DatosJugador jugador = new DatosJugador();
-            jugador.id = pJson.getString("id");
-            jugador.nickname = pJson.getString("nickname");
-            jugador.x = pJson.getFloat("x");
-            jugador.y = pJson.getFloat("y");
-            jugador.color = pJson.getString("color", "Blanco");
-            jugadoresOnline.add(jugador);
+        // --- PARTE 1: JUGADORES ---
+        JsonValue playersJson = data.get("players");
+        if (playersJson != null && playersJson.isArray()) {
+            jugadoresOnline.clear();
+            for (JsonValue pJson : playersJson) {
+                // SEGURIDAD: Solo procesamos si existe el campo "id"
+                if (pJson.has("id")) {
+                    DatosJugador dj = new DatosJugador();
+                    dj.id = pJson.getString("id");
+                    dj.nickname = pJson.getString("nickname", "Anon");
+                    dj.x = pJson.getFloat("x", 0);
+                    dj.y = pJson.getFloat("y", 0);
+                    dj.color = pJson.getString("color", "blanco").toLowerCase();
+                    jugadoresOnline.add(dj);
+                }
+            }
+        }
+
+        // --- PARTE 2: MUNDO (PUERTA) ---
+        JsonValue world = data.get("world");
+        if (world != null && world.has("door")) {
+            JsonValue door = world.get("door");
+            this.puertaX = door.getFloat("x", 0);
+            this.puertaY = door.getFloat("y", 0);
+            this.puertaWidth = door.getFloat("width", 50);
+            this.puertaHeight = door.getFloat("height", 50);
         }
     }
-
     @Override
     public void render(float delta) {
         enviarInput();
@@ -220,10 +240,8 @@ public class GameScreen extends ScreenAdapter {
         Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // =========================================================
         // CAMBIO DE CÁMARA: Empujamos la cámara hacia abajo (-80 px)
         // para que el mapa se vea más arriba en la pantalla.
-        // =========================================================
         camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
         camara.update();
 
@@ -238,7 +256,8 @@ public class GameScreen extends ScreenAdapter {
         for (DatosJugador jugador : jugadoresOnline) {
             TextureRegion texturaJugador = animacionesPorColor.get(jugador.color);
             if (texturaJugador == null) {
-                texturaJugador = animacionesPorColor.get("Blanco");
+                // CAMBIO: Valor por defecto en minúscula
+                texturaJugador = animacionesPorColor.get("blanco");
             }
             batch.draw(texturaJugador, jugador.x, jugador.y);
         }
