@@ -5,12 +5,13 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -19,54 +20,117 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.JsonValue;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.Viewport;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class GameScreen extends ScreenAdapter {
 
     private Game game;
     private GameClient cliente;
     private SpriteBatch batch;
-    private ShapeRenderer shapeRenderer;
 
+    private OrthographicCamera camara;
+    private Viewport gameViewport;
+
+    // INTERFAZ Y CONTROLES
     private Stage stage;
     private Skin skin;
     private boolean isLeftPressed = false;
     private boolean isRightPressed = false;
     private boolean isJumpPressed = false;
 
-    private Texture[] texturasEsqueletos;
-    private TextureRegion[] animacionesIdle;
+    // MAPA
+    private MapRender mapRender;
 
-    private float spawnX = 100f;
-    private float spawnY = 64f; // Justo encima del suelo
+    // SISTEMA DE COLORES
+    private List<Texture> texturasCargadas = new ArrayList<>();
+    private Map<String, TextureRegion> animacionesPorColor = new HashMap<>();
+
+    private List<DatosJugador> jugadoresOnline = new ArrayList<>();
+
+    // CLASE DE DATOS
+    private class DatosJugador {
+        String id;
+        String nickname;
+        float x;
+        float y;
+        String color;
+    }
 
     public GameScreen(Game game, GameClient cliente) {
         this.game = game;
         this.cliente = cliente;
+
+        if (this.cliente != null) {
+            this.cliente.setPantallaJuego(this);
+        }
+
         this.batch = new SpriteBatch();
-        this.shapeRenderer = new ShapeRenderer();
+
+        this.camara = new OrthographicCamera();
+        this.gameViewport = new FitViewport(800, 480, camara);
 
         this.stage = new Stage(new FitViewport(800, 480));
         Gdx.input.setInputProcessor(this.stage);
 
         cargarAnimaciones();
         construirUI();
+
+        // Cargamos el mapa
+        mapRender = new MapRender();
     }
 
     private void cargarAnimaciones() {
-        String[] archivosColores = {
+        String[] nombresColores = {"Blanco", "Negro", "Amarillo", "Azul", "Verde", "Rojo", "Turquesa", "Violeta"};
+        String[] archivosPng = {
             "media/skeleton_color1.png",
+            "media/skeleton_color2.png",
+            "media/skeleton_color3.png",
+            "media/skeleton_color4.png",
             "media/skeleton_color5.png",
-            "media/skeleton_color6.png"
+            "media/skeleton_color6.png",
+            "media/skeleton_color7.png",
+            "media/skeleton_color8.png"
         };
 
-        texturasEsqueletos = new Texture[archivosColores.length];
-        animacionesIdle = new TextureRegion[archivosColores.length];
+        for (int i = 0; i < nombresColores.length; i++) {
+            Texture tex = new Texture(Gdx.files.internal(archivosPng[i]));
+            texturasCargadas.add(tex);
 
-        for (int i = 0; i < archivosColores.length; i++) {
-            texturasEsqueletos[i] = new Texture(Gdx.files.internal(archivosColores[i]));
-            TextureRegion[][] frames = TextureRegion.split(texturasEsqueletos[i], 112, 186);
-            animacionesIdle[i] = frames[0][0];
+            TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
+            animacionesPorColor.put(nombresColores[i], frames[0][0]);
         }
+    }
+
+    // =========================================================
+    // MÉTODO NUEVO: Crea un botón transparente y con hitbox circular
+    // =========================================================
+    private TextButton crearBotonCircular(String texto, Skin skin) {
+        TextButton boton = new TextButton(texto, skin) {
+            @Override
+            public Actor hit(float x, float y, boolean touchable) {
+                // Calculamos si el toque del usuario está dentro del círculo
+                float radio = getWidth() / 2f;
+                float centroX = radio;
+                float centroY = getHeight() / 2f;
+
+                float distancia = (float) Math.sqrt(Math.pow(x - centroX, 2) + Math.pow(y - centroY, 2));
+
+                if (distancia <= radio) {
+                    return super.hit(x, y, touchable); // Tocó el círculo
+                }
+                return null; // Tocó la esquina vacía (ignorar)
+            }
+        };
+
+        // Transparencia al 50%
+        boton.getColor().a = 0.5f;
+
+        return boton;
     }
 
     private void construirUI() {
@@ -87,17 +151,19 @@ public class GameScreen extends ScreenAdapter {
         tabla.setFillParent(true);
         tabla.bottom().padBottom(20);
 
-        TextButton btnIzquierda = new TextButton("<", skin);
-        TextButton btnDerecha = new TextButton(">", skin);
-        TextButton btnSalto = new TextButton("SALTO", skin);
+        // Usamos nuestro nuevo método para crear los botones
+        TextButton btnIzquierda = crearBotonCircular("<", skin);
+        TextButton btnDerecha = crearBotonCircular(">", skin);
+        TextButton btnSalto = crearBotonCircular("SALTO", skin);
 
         btnIzquierda.addListener(crearListenerBoton("left"));
         btnDerecha.addListener(crearListenerBoton("right"));
         btnSalto.addListener(crearListenerBoton("jump"));
 
-        tabla.add(btnIzquierda).width(100).height(80).padRight(20);
-        tabla.add(btnDerecha).width(100).height(80).expandX().left();
-        tabla.add(btnSalto).width(120).height(80).right().padRight(20);
+        // Ajustamos las medidas para que sean cuadradas (90x90), así el radio hace un círculo perfecto
+        tabla.add(btnIzquierda).width(90).height(90).padRight(20);
+        tabla.add(btnDerecha).width(90).height(90).expandX().left();
+        tabla.add(btnSalto).width(90).height(90).right().padRight(20);
 
         stage.addActor(tabla);
         pixmap.dispose();
@@ -133,6 +199,20 @@ public class GameScreen extends ScreenAdapter {
         }
     }
 
+    public void actualizarEstado(JsonValue playersJson) {
+        jugadoresOnline.clear();
+
+        for (JsonValue pJson : playersJson) {
+            DatosJugador jugador = new DatosJugador();
+            jugador.id = pJson.getString("id");
+            jugador.nickname = pJson.getString("nickname");
+            jugador.x = pJson.getFloat("x");
+            jugador.y = pJson.getFloat("y");
+            jugador.color = pJson.getString("color", "Blanco");
+            jugadoresOnline.add(jugador);
+        }
+    }
+
     @Override
     public void render(float delta) {
         enviarInput();
@@ -140,15 +220,29 @@ public class GameScreen extends ScreenAdapter {
         Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        shapeRenderer.setColor(Color.DARK_GRAY);
-        shapeRenderer.rect(0, 0, Gdx.graphics.getWidth(), 64);
-        shapeRenderer.end();
+        // =========================================================
+        // CAMBIO DE CÁMARA: Empujamos la cámara hacia abajo (-80 px)
+        // para que el mapa se vea más arriba en la pantalla.
+        // =========================================================
+        camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
+        camara.update();
+
+        batch.setProjectionMatrix(camara.combined);
 
         batch.begin();
-        if (animacionesIdle.length > 0) {
-            batch.draw(animacionesIdle[0], spawnX, spawnY);
+
+        if (mapRender != null) {
+            mapRender.render(batch);
         }
+
+        for (DatosJugador jugador : jugadoresOnline) {
+            TextureRegion texturaJugador = animacionesPorColor.get(jugador.color);
+            if (texturaJugador == null) {
+                texturaJugador = animacionesPorColor.get("Blanco");
+            }
+            batch.draw(texturaJugador, jugador.x, jugador.y);
+        }
+
         batch.end();
 
         stage.act(delta);
@@ -157,23 +251,19 @@ public class GameScreen extends ScreenAdapter {
 
     @Override
     public void resize(int width, int height) {
+        gameViewport.update(width, height, true); // El 'true' centra la cámara temporalmente
         stage.getViewport().update(width, height, true);
-    }
-
-    public void actualizarEstado(JsonValue playersJson) {
     }
 
     @Override
     public void dispose() {
         batch.dispose();
-        shapeRenderer.dispose();
         stage.dispose();
         if (skin != null) skin.dispose();
+        if (mapRender != null) mapRender.dispose();
 
-        if (texturasEsqueletos != null) {
-            for (Texture tex : texturasEsqueletos) {
-                if (tex != null) tex.dispose();
-            }
+        for (Texture tex : texturasCargadas) {
+            tex.dispose();
         }
     }
 }
