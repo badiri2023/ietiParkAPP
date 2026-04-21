@@ -10,7 +10,6 @@ import java.net.URI;
 public class GameClient extends WebSocketClient {
 
     private LoginScreen pantallaLogin;
-    // NUEVO: Referencia a la pantalla de juego
     private GameScreen pantallaJuego;
 
     private JsonReader jsonReader = new JsonReader();
@@ -38,7 +37,6 @@ public class GameClient extends WebSocketClient {
             String type = json.getString("type");
 
             if (type.equals("WELCOME")) {
-                // El servidor nos aceptó, pasamos a GameScreen
                 Gdx.app.postRunnable(() -> {
                     if (pantallaLogin != null) pantallaLogin.irAlJuego();
                 });
@@ -53,9 +51,7 @@ public class GameClient extends WebSocketClient {
                     if (pantallaLogin != null) pantallaLogin.actualizarLista(nombres);
                 });
             }
-            // ==========================================
-            // NUEVO: LEER POSICIONES DURANTE LA PARTIDA
-            // ==========================================
+
             else if (type.equals("STATE_UPDATE")) {
                 JsonValue players = json.get("players");
                 // Le pasamos los datos a la pantalla de juego (si ya está creada)

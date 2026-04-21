@@ -1,0 +1,249 @@
+{
+  "name": "ietiPico",
+  "description": "",
+  "levels": [
+    {
+      "name": "level0",
+      "description": "",
+      "gameplayData": "",
+      "layers": [
+        {
+          "name": "suelo",
+          "gameplayData": "",
+          "x": 0,
+          "y": 0,
+          "depth": 0.0,
+          "tilesSheetFile": "media/TileSetMap_Png.png",
+          "tilesWidth": 16,
+          "tilesHeight": 16,
+          "visible": true,
+          "groupId": "__main__",
+          "tileMapFile": "tilemaps/level_000_layer_000.json"
+        },
+        {
+          "name": "juego",
+          "gameplayData": "",
+          "x": 0,
+          "y": 0,
+          "depth": 0.0,
+          "tilesSheetFile": "media/TileSetMap_Png.png",
+          "tilesWidth": 16,
+          "tilesHeight": 16,
+          "visible": true,
+          "groupId": "__main__",
+          "tileMapFile": "tilemaps/level_000_layer_001.json"
+        }
+      ],
+      "layerGroups": [
+        {
+          "id": "__main__",
+          "name": "Main",
+          "collapsed": false
+        }
+      ],
+      "sprites": [
+        {
+          "name": "player1",
+          "gameplayData": "",
+          "type": "player1",
+          "animationId": "anim_1776697186675083",
+          "x": 114,
+          "y": 390,
+          "width": 112,
+          "height": 186,
+          "imageFile": "media/skeleton_color1.png",
+          "flipX": false,
+          "flipY": false,
+          "depth": 0.0,
+          "groupId": "__main__"
+        },
+        {
+          "name": "door",
+          "gameplayData": "",
+          "type": "door",
+          "animationId": "anim_1776701483295954",
+          "x": 618,
+          "y": 280,
+          "width": 266,
+          "height": 310,
+          "imageFile": "media/door.png",
+          "flipX": false,
+          "flipY": false,
+          "depth": 0.0,
+          "groupId": "__main__"
+        }
+      ],
+      "spriteGroups": [
+        {
+          "id": "__main__",
+          "name": "Main",
+          "collapsed": false
+        }
+      ],
+      "groupId": "__main__",
+      "viewportWidth": 400,
+      "viewportHeight": 200,
+      "viewportX": 2,
+      "viewportY": 256,
+      "viewportAdaptation": "letterbox",
+      "viewportInitialColor": "green",
+      "viewportPreviewColor": "blue",
+      "backgroundColorHex": "#33335E",
+      "depthSensitivity": 0.08,
+      "zonesFile": "zones/level_000_zones.json",
+      "pathsFile": "paths/level_000_paths.json"
+    }
+  ],
+  "levelGroups": [
+    {
+      "id": "__main__",
+      "name": "Main",
+      "collapsed": false
+    }
+  ],
+  "mediaAssets": [
+    {
+      "name": "TileSetMap_Png",
+      "fileName": "media/TileSetMap_Png.png",
+      "mediaType": "tileset",
+      "tileWidth": 16,
+      "tileHeight": 16,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "Fondo_PNG",
+      "fileName": "media/Fondo_PNG.png",
+      "mediaType": "atlas",
+      "tileWidth": 400,
+      "tileHeight": 320,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "door",
+      "fileName": "media/door.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 266,
+      "tileHeight": 310,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_key",
+      "fileName": "media/skeleton_key.png",
+      "mediaType": "tileset",
+      "tileWidth": 32,
+      "tileHeight": 32,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeletonpng",
+      "fileName": "media/skeletonpng.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 275,
+      "tileHeight": 439,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_color1",
+      "fileName": "media/skeleton_color1.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 112,
+      "tileHeight": 186,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_color2",
+      "fileName": "media/skeleton_color2.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 112,
+      "tileHeight": 186,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_color3",
+      "fileName": "media/skeleton_color3.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 112,
+      "tileHeight": 186,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_color4",
+      "fileName": "media/skeleton_color4.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 112,
+      "tileHeight": 186,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_color5",
+      "fileName": "media/skeleton_color5.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 112,
+      "tileHeight": 186,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_color6",
+      "fileName": "media/skeleton_color6.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 112,
+      "tileHeight": 186,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_color7",
+      "fileName": "media/skeleton_color7.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 112,
+      "tileHeight": 186,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    },
+    {
+      "name": "skeleton_color8",
+      "fileName": "media/skeleton_color8.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 112,
+      "tileHeight": 186,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
+    }
+  ],
+  "mediaGroups": [
+    {
+      "id": "__main__",
+      "name": "Main",
+      "collapsed": false
+    }
+  ],
+  "zoneTypes": [
+    {
+      "name": "Default",
+      "color": "cyan"
+    },
+    {
+      "name": "spawn",
+      "color": "yellow"
+    },
+    {
+      "name": "key",
+      "color": "red"
+    },
+    {
+      "name": "exitdoor",
+      "color": "green"
+    }
+  ],
+  "animationsFile": "animations/animations.json"
+}

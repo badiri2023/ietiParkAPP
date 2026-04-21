@@ -28,9 +28,6 @@ public class GraveyardScreen extends ScreenAdapter {
         this.cliente = cliente;
         this.stage = new Stage(new FitViewport(640, 360));
 
-        // VINCULACIÓN CRÍTICA: Le decimos al cliente que ahora mande los datos aquí
-        //this.cliente.setPantallaGraveyard(this);
-
         prepararSkin();
         construirInterfaz();
     }
@@ -39,13 +36,11 @@ public class GraveyardScreen extends ScreenAdapter {
         skin = new Skin();
         skin.add("default", new BitmapFont());
 
-        // Textura para la línea blanca
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmap.setColor(Color.WHITE);
         pixmap.fill();
         skin.add("lineaBlanca", new Texture(pixmap));
 
-        // Estilos de texto
         skin.add("titulo", new Label.LabelStyle(skin.getFont("default"), Color.WHITE));
         skin.add("lista", new Label.LabelStyle(skin.getFont("default"), Color.LIGHT_GRAY));
     }
@@ -60,7 +55,6 @@ public class GraveyardScreen extends ScreenAdapter {
 
         Image linea = new Image(skin.getDrawable("lineaBlanca"));
 
-        // Esta es la tabla que se vacía y se llena sola
         tablaJugadores = new Table();
         tablaJugadores.top();
 
@@ -71,9 +65,8 @@ public class GraveyardScreen extends ScreenAdapter {
         stage.addActor(tablaPrincipal);
     }
 
-    // EL MÉTODO QUE BUSCA EL CLIENTE
     public void actualizarLista(String[] nombres) {
-        tablaJugadores.clearChildren(); // Limpiamos la lista anterior
+        tablaJugadores.clearChildren();
         for (String nombre : nombres) {
             Label lbl = new Label(nombre, skin, "lista");
             lbl.setFontScale(1.3f);
@@ -83,7 +76,6 @@ public class GraveyardScreen extends ScreenAdapter {
 
     @Override
     public void render(float delta) {
-        // Usamos el mismo color de fondo que tu Login para que sea coherente
         Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         stage.act(delta);

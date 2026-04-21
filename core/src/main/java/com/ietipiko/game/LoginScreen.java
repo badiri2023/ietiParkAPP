@@ -31,20 +31,17 @@ public class LoginScreen extends ScreenAdapter {
     private Skin skin;
     private Dialog dialogoActual;
 
-    // Variables para la fusión del Lobby
     private Table tablaJugadores;
     private GameClient cliente;
 
     public LoginScreen(Game game) {
         this.game = game;
-        // Viewport más ancho (800x480) para que quepan las dos columnas cómodamente
         stage = new Stage(new FitViewport(800, 480));
         Gdx.input.setInputProcessor(stage);
 
         crearEstilos();
         construirInterfaz();
 
-        // Nos conectamos al servidor nada más abrir la app para cargar la lista
         conectarAlServidorInicial();
     }
 
@@ -52,7 +49,6 @@ public class LoginScreen extends ScreenAdapter {
         skin = new Skin();
         skin.add("default", new BitmapFont());
 
-        // Texturas y colores originales de Picko Skull
         Pixmap pixmapGris = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmapGris.setColor(new Color(0.12f, 0.12f, 0.15f, 1f));
         pixmapGris.fill();
@@ -68,7 +64,6 @@ public class LoginScreen extends ScreenAdapter {
         pixmapBlanco.fill();
         skin.add("blanco", new Texture(pixmapBlanco));
 
-        // Estilos de los componentes
         Label.LabelStyle labelStyle = new Label.LabelStyle(skin.getFont("default"), Color.LIGHT_GRAY);
         skin.add("default", labelStyle);
 
@@ -96,9 +91,6 @@ public class LoginScreen extends ScreenAdapter {
         Table root = new Table();
         root.setFillParent(true);
 
-        // ==========================================
-        // SECCIÓN LOGIN (Ahora irá a la derecha)
-        // ==========================================
         Table ladoLogin = new Table();
         Label titulo = new Label("Picko Skull", skin);
         titulo.setFontScale(1.8f);
@@ -131,14 +123,9 @@ public class LoginScreen extends ScreenAdapter {
         ladoLogin.add(campoNombre).width(300).height(40).expandY().center().row();
         ladoLogin.add(btnEntrar).width(200).height(50).expandY().bottom().padBottom(40);
 
-        // ==========================================
-        // SEPARADOR CENTRAL (Línea Blanca)
-        // ==========================================
+
         Image lineaSeparadora = new Image(skin.getDrawable("blanco"));
 
-        // ==========================================
-        // SECCIÓN GRAVEYARD (Ahora irá a la izquierda)
-        // ==========================================
         Table ladoGraveyard = new Table();
         ladoGraveyard.top();
 
@@ -152,24 +139,20 @@ public class LoginScreen extends ScreenAdapter {
         ladoGraveyard.add(subTitulo).padTop(40).padBottom(20).row();
         ladoGraveyard.add(new ScrollPane(tablaJugadores)).expand().fill();
 
-        // ==========================================
-        // ENSAMBLAJE FINAL DE LA PANTALLA (Invertido)
-        // ==========================================
-        root.add(ladoGraveyard).expand().fill(); // 1º Graveyard (Izquierda)
-        root.add(lineaSeparadora).width(2).fillY().padTop(20).padBottom(20); // 2º Línea (Centro)
-        root.add(ladoLogin).expand().fill(); // 3º Login (Derecha)
+        root.add(ladoGraveyard).expand().fill();
+        root.add(lineaSeparadora).width(2).fillY().padTop(20).padBottom(20);
+        root.add(ladoLogin).expand().fill();
 
         stage.addActor(root);
     }
 
     private void conectarAlServidorInicial() {
         try {
-            // IP correcta para emulador Android apuntando a tu PC.
-            // Si usas PC a PC o Móvil real por WiFi, pon "192.168..." o "10.0.0.X"
-            String ipServidor = "10.0.2.2";
-            String puerto = "3000"; // CORREGIDO: Antes ponía "80803000"
 
-            URI uri = new URI("ws://" + ipServidor + ":" + puerto);
+            String ipServidor = "pico4.ieti.site";
+            String puerto = "443";
+
+            URI uri = new URI("wss://" + ipServidor + ":" + puerto);
             cliente = new GameClient(uri, this);
             cliente.connect();
         } catch (Exception e) {
@@ -188,10 +171,8 @@ public class LoginScreen extends ScreenAdapter {
     }
 
     public void irAlJuego() {
-        // Usamos postRunnable para asegurarnos de que el cambio de pantalla ocurra en el hilo de renderizado
         Gdx.app.postRunnable(() -> {
             if (dialogoActual != null) dialogoActual.remove();
-            // Pasamos 'game' para poder cambiar pantallas y 'cliente' para seguir comunicados
             game.setScreen(new GameScreen(game, cliente));
         });
     }
