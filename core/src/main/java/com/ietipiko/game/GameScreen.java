@@ -61,10 +61,13 @@ public class GameScreen extends ScreenAdapter {
         float y;
         String color;
     }
+    private JsonValue initialData; // Guardamos los datos de inicio
 
-    public GameScreen(Game game, GameClient cliente) {
+    public GameScreen(Game game, GameClient cliente,JsonValue initialData) {
         this.game = game;
         this.cliente = cliente;
+        this.initialData = initialData; // <--- GUARDAMOS EL MUNDO
+
 
         if (this.cliente != null) {
             this.cliente.setPantallaJuego(this);

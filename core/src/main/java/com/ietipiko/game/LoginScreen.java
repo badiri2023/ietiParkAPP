@@ -153,7 +153,7 @@ public class LoginScreen extends ScreenAdapter {
             String puerto = "443";
 
             URI uri = new URI("wss://" + ipServidor + ":" + puerto);
-            cliente = new GameClient(uri, this);
+            cliente = new GameClient(uri, this,this.game);
             cliente.connect();
         } catch (Exception e) {
             System.out.println("No se pudo iniciar la conexión automática: " + e.getMessage());
@@ -170,12 +170,12 @@ public class LoginScreen extends ScreenAdapter {
         }
     }
 
-    public void irAlJuego() {
+    /*public void irAlJuego() {
         Gdx.app.postRunnable(() -> {
             if (dialogoActual != null) dialogoActual.remove();
             game.setScreen(new GameScreen(game, cliente));
         });
-    }
+    }*/
 
     public void mostrarDialogoCarga(String titulo, String mensaje) {
         if (dialogoActual != null) dialogoActual.remove();
