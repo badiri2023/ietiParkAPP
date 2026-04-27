@@ -325,12 +325,12 @@ public class GameScreen extends ScreenAdapter {
                 float offsetY = 50;
                 batch.draw(texturaKey, jugador.x + offsetX, jugador.y + offsetY, keyWidth, keyHeight);
             }
-            if (keyHolderId == null && !keyCollected) {
-                batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
-            }
 
         }
-
+        // Si nadie tiene la llave, dibujarla en el suelo
+        if (keyHolderId == null && !keyCollected) {
+            batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
+        }
 
         batch.end();
 
@@ -353,9 +353,10 @@ public class GameScreen extends ScreenAdapter {
 
         for (Texture tex : texturasCargadas) {
             tex.dispose();
+        }
             texturaKey.dispose();
             texturaPuerta.dispose();
 
-        }
+
     }
 }
