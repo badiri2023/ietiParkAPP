@@ -1388,6 +1388,29 @@
           "hitBoxes": []
         }
       ]
+    },
+    {
+      "id": "anim_1777305199392731",
+      "name": "key",
+      "mediaFile": "media/skeleton_key.png",
+      "startFrame": 0,
+      "endFrame": 0,
+      "fps": 12.0,
+      "loop": true,
+      "groupId": "__main__",
+      "anchorX": 0.484375,
+      "anchorY": 0.5,
+      "anchorColor": "red",
+      "hitBoxes": [],
+      "frameRigs": [
+        {
+          "frame": 0,
+          "anchorX": 0.484375,
+          "anchorY": 0.5,
+          "anchorColor": "red",
+          "hitBoxes": []
+        }
+      ]
     }
   ]
 }

@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -43,13 +44,18 @@ public class GameScreen extends ScreenAdapter {
     private boolean isRightPressed = false;
     private boolean isJumpPressed = false;
     private float puertaX, puertaY, puertaWidth, puertaHeight;
+    private float keyX, keyY, keyWidth, keyHeight;
+    private boolean keyCollected = false;
+    private Texture texturaKey;
     private Texture texturaPuerta; // No olvides cargarla en cargarAnimaciones()
+    private String keyHolderId = null;
+
     // MAPA
     private MapRender mapRender;
 
     // SISTEMA DE COLORES
     private List<Texture> texturasCargadas = new ArrayList<>();
-    private Map<String, TextureRegion> animacionesPorColor = new HashMap<>();
+    private Map<String, Map<String, Animation<TextureRegion>>> animacionesPorColor = new HashMap<>();
 
     private List<DatosJugador> jugadoresOnline = new ArrayList<>();
 
@@ -60,13 +66,17 @@ public class GameScreen extends ScreenAdapter {
         float x;
         float y;
         String color;
+        float stateTime = 0f;
+
     }
-    private JsonValue initialData; // Guardamos los datos de inicio
+    private JsonValue initialData;
 
     public GameScreen(Game game, GameClient cliente,JsonValue initialData) {
         this.game = game;
         this.cliente = cliente;
-        this.initialData = initialData; // <--- GUARDAMOS EL MUNDO
+        this.initialData = initialData;
+        texturaKey = new Texture(Gdx.files.internal("media/skeleton_key.png"));
+        texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
 
 
         if (this.cliente != null) {
@@ -89,7 +99,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void cargarAnimaciones() {
-        // CAMBIO: Todo en minúsculas para coincidir con "colors.js" del servidor
+        //Todo en minúsculas para coincidir con "colors.js" del servidor
         String[] nombresColores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
         String[] archivosPng = {
             "media/skeleton_color1.png",
@@ -103,12 +113,31 @@ public class GameScreen extends ScreenAdapter {
         };
 
         for (int i = 0; i < nombresColores.length; i++) {
+
             Texture tex = new Texture(Gdx.files.internal(archivosPng[i]));
             texturasCargadas.add(tex);
 
+            // Dividir spritesheet en frames de 112x186
             TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
-            animacionesPorColor.put(nombresColores[i], frames[0][0]);
+
+            // Crear animación IDLE (frames 0 a 3)
+            Animation<TextureRegion> idleAnim = new Animation<>(
+                0.20f, // duración por frame
+                frames[0][0],
+                frames[0][1],
+                frames[0][2],
+                frames[0][3]
+            );
+            idleAnim.setPlayMode(Animation.PlayMode.LOOP);
+
+            // Crear mapa de animaciones para este color
+            Map<String, Animation<TextureRegion>> anims = new HashMap<>();
+            anims.put("idle", idleAnim);
+
+            // Guardar en el mapa principal
+            animacionesPorColor.put(nombresColores[i], anims);
         }
+
     }
 
     // =========================================================
@@ -132,8 +161,8 @@ public class GameScreen extends ScreenAdapter {
             }
         };
 
-        // Transparencia al 50%
-        boton.getColor().a = 0.5f;
+        // Transparencia al 70%
+        boton.getColor().a = 0.7f;
 
         return boton;
     }
@@ -234,7 +263,20 @@ public class GameScreen extends ScreenAdapter {
             this.puertaY = door.getFloat("y", 0);
             this.puertaWidth = door.getFloat("width", 50);
             this.puertaHeight = door.getFloat("height", 50);
+
         }
+        if (world != null && world.has("key")) {
+            JsonValue key = world.get("key");
+            this.keyX = key.getFloat("x", 0);
+            this.keyY = key.getFloat("y", 0);
+            this.keyWidth = key.getFloat("width", 32);
+            this.keyHeight = key.getFloat("height", 32);
+            this.keyCollected = key.getBoolean("collected", false);
+            if (key.has("holderId")) {
+                keyHolderId = key.getString("holderId", null);
+            }
+        }
+
     }
     @Override
     public void render(float delta) {
@@ -243,8 +285,7 @@ public class GameScreen extends ScreenAdapter {
         Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // CAMBIO DE CÁMARA: Empujamos la cámara hacia abajo (-80 px)
-        // para que el mapa se vea más arriba en la pantalla.
+        // Ajuste de cámara
         camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
         camara.update();
 
@@ -252,17 +293,43 @@ public class GameScreen extends ScreenAdapter {
 
         batch.begin();
 
+        // Dibujar mapa
         if (mapRender != null) {
             mapRender.render(batch);
         }
 
+        // Dibujar puerta
+        batch.draw(texturaPuerta, puertaX, puertaY, puertaWidth, puertaHeight);
+
+        // Dibujar llave si no está recogida
+        if (!keyCollected) {
+            batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
+        }
+
+        // Dibujar jugadores con animación idle
         for (DatosJugador jugador : jugadoresOnline) {
-            TextureRegion texturaJugador = animacionesPorColor.get(jugador.color);
-            if (texturaJugador == null) {
-                // CAMBIO: Valor por defecto en minúscula
-                texturaJugador = animacionesPorColor.get("blanco");
+
+            jugador.stateTime += delta;
+
+            Animation<TextureRegion> idle = animacionesPorColor
+                .get(jugador.color)
+                .get("idle");
+
+            TextureRegion frame = idle.getKeyFrame(jugador.stateTime);
+
+            batch.draw(frame, jugador.x, jugador.y);
+
+            // Si este jugador tiene la llave, dibujarla encima
+            if (keyHolderId != null && keyHolderId.equals(jugador.id)) {
+                float offsetX = 20;
+                float offsetY = 50;
+                batch.draw(texturaKey, jugador.x + offsetX, jugador.y + offsetY, keyWidth, keyHeight);
             }
-            batch.draw(texturaJugador, jugador.x, jugador.y);
+
+        }
+        // Si nadie tiene la llave, dibujarla en el suelo
+        if (keyHolderId == null && !keyCollected) {
+            batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
         }
 
         batch.end();
@@ -287,5 +354,9 @@ public class GameScreen extends ScreenAdapter {
         for (Texture tex : texturasCargadas) {
             tex.dispose();
         }
+            texturaKey.dispose();
+            texturaPuerta.dispose();
+
+
     }
 }
