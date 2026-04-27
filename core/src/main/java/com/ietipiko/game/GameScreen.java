@@ -66,7 +66,7 @@ public class GameScreen extends ScreenAdapter {
     public GameScreen(Game game, GameClient cliente,JsonValue initialData) {
         this.game = game;
         this.cliente = cliente;
-        this.initialData = initialData; // <--- GUARDAMOS EL MUNDO
+        this.initialData = initialData;
 
 
         if (this.cliente != null) {
@@ -89,7 +89,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void cargarAnimaciones() {
-        // CAMBIO: Todo en minúsculas para coincidir con "colors.js" del servidor
+        //Todo en minúsculas para coincidir con "colors.js" del servidor
         String[] nombresColores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
         String[] archivosPng = {
             "media/skeleton_color1.png",
@@ -133,7 +133,7 @@ public class GameScreen extends ScreenAdapter {
         };
 
         // Transparencia al 50%
-        boton.getColor().a = 0.5f;
+        boton.getColor().a = 0.7f;
 
         return boton;
     }
