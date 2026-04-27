@@ -149,10 +149,10 @@ public class LoginScreen extends ScreenAdapter {
     private void conectarAlServidorInicial() {
         try {
 
-            //String ipServidor = "pico4.ieti.site";
-            //String puerto = "443";
-            String ipServidor = "192.168.1.45"; // IP de tu PC
-            String puerto = "3000";
+            String ipServidor = "pico4.ieti.site";
+            String puerto = "443";
+            //String ipServidor = "192.168.1.45"; // IP de tu PC
+            //String puerto = "3000";
 
             URI uri = new URI("wss://" + ipServidor + ":" + puerto);
             cliente = new GameClient(uri, this,this.game);

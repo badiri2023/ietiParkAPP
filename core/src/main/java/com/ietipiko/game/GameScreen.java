@@ -74,8 +74,9 @@ public class GameScreen extends ScreenAdapter {
     public GameScreen(Game game, GameClient cliente,JsonValue initialData) {
         this.game = game;
         this.cliente = cliente;
-        this.initialData = initialData;
-        texturaKey = new Texture(Gdx.files.internal("media/skeleton_key.png"));
+        if (this.initialData != null) {
+            actualizarEstado(this.initialData);
+        }        texturaKey = new Texture(Gdx.files.internal("media/skeleton_key.png"));
         texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
 
 
