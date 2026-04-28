@@ -37,192 +37,208 @@ public class GameScreen extends ScreenAdapter {
     private OrthographicCamera camara;
     private Viewport gameViewport;
 
-    // INTERFAZ Y CONTROLES
     private Stage stage;
     private Skin skin;
+
+    // Estados de entrada
     private boolean isLeftPressed = false;
     private boolean isRightPressed = false;
     private boolean isJumpPressed = false;
-    private float puertaX, puertaY, puertaWidth, puertaHeight;
-    private float keyX, keyY, keyWidth, keyHeight;
+
+    // Entidades del Mundo (Valores por defecto según tu JSON)
+    private float puertaX, puertaY;
+    private float puertaWidth = 266, puertaHeight = 310;
+    private float keyX, keyY;
+    private float keyWidth = 32, keyHeight = 32;
     private boolean keyCollected = false;
-    private Texture texturaKey;
-    private Texture texturaPuerta; // No olvides cargarla en cargarAnimaciones()
     private String keyHolderId = null;
 
-    // MAPA
+    private Texture texturaKey;
+    private Texture texturaPuerta;
     private MapRender mapRender;
 
-    // SISTEMA DE COLORES
     private List<Texture> texturasCargadas = new ArrayList<>();
     private Map<String, Map<String, Animation<TextureRegion>>> animacionesPorColor = new HashMap<>();
-
     private List<DatosJugador> jugadoresOnline = new ArrayList<>();
 
-    // CLASE DE DATOS
     private class DatosJugador {
         String id;
         String nickname;
-        float x;
-        float y;
+        float x, y;
         String color;
         float stateTime = 0f;
-
     }
-    private JsonValue initialData;
 
-    public GameScreen(Game game, GameClient cliente,JsonValue initialData) {
+    public GameScreen(Game game, GameClient cliente, JsonValue initialData) {
         this.game = game;
         this.cliente = cliente;
-        if (this.initialData != null) {
-            actualizarEstado(this.initialData);
-        }        texturaKey = new Texture(Gdx.files.internal("media/skeleton_key.png"));
-        texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
 
+        // 1. Configuración de Cámara y Viewport (Sincronizado con el Server 400x200)
+        this.camara = new OrthographicCamera();
+        this.gameViewport = new FitViewport(800, 600, camara);
+        this.batch = new SpriteBatch();
+
+        // 2. Carga de Texturas
+        texturaKey = new Texture(Gdx.files.internal("media/skeleton_key.png"));
+        texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
+        cargarAnimaciones();
+
+        // 3. Interfaz de Usuario (Controles)
+        this.stage = new Stage(new FitViewport(800, 480)); // UI con resolución más alta para botones claros
+        Gdx.input.setInputProcessor(this.stage);
+        construirUI();
+
+        // 4. Inicializar Mapa y Datos
+        mapRender = new MapRender();
 
         if (this.cliente != null) {
             this.cliente.setPantallaJuego(this);
         }
 
-        this.batch = new SpriteBatch();
-
-        this.camara = new OrthographicCamera();
-        this.gameViewport = new FitViewport(800, 480, camara);
-
-        this.stage = new Stage(new FitViewport(800, 480));
-        Gdx.input.setInputProcessor(this.stage);
-
-        cargarAnimaciones();
-        construirUI();
-
-        // Cargamos el mapa
-        mapRender = new MapRender();
+        // Si tenemos datos iniciales del mundo (WORLD_INIT), los cargamos ya
+        if (initialData != null) {
+            inicializarMundo(initialData);
+        }
     }
 
-    private void cargarAnimaciones() {
-        //Todo en minúsculas para coincidir con "colors.js" del servidor
-        String[] nombresColores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
-        String[] archivosPng = {
-            "media/skeleton_color1.png",
-            "media/skeleton_color2.png",
-            "media/skeleton_color3.png",
-            "media/skeleton_color4.png",
-            "media/skeleton_color5.png",
-            "media/skeleton_color6.png",
-            "media/skeleton_color7.png",
-            "media/skeleton_color8.png"
-        };
+    // --- PROCESAMIENTO DE DATOS ---
 
-        for (int i = 0; i < nombresColores.length; i++) {
+    public void inicializarMundo(JsonValue data) {
+        if (data == null) return;
 
-            Texture tex = new Texture(Gdx.files.internal(archivosPng[i]));
-            texturasCargadas.add(tex);
-
-            // Dividir spritesheet en frames de 112x186
-            TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
-
-            // Crear animación IDLE (frames 0 a 3)
-            Animation<TextureRegion> idleAnim = new Animation<>(
-                0.20f, // duración por frame
-                frames[0][0],
-                frames[0][1],
-                frames[0][2],
-                frames[0][3]
-            );
-            idleAnim.setPlayMode(Animation.PlayMode.LOOP);
-
-            // Crear mapa de animaciones para este color
-            Map<String, Animation<TextureRegion>> anims = new HashMap<>();
-            anims.put("idle", idleAnim);
-
-            // Guardar en el mapa principal
-            animacionesPorColor.put(nombresColores[i], anims);
+        if (data.has("door")) {
+            JsonValue door = data.get("door");
+            this.puertaX = door.getFloat("x", 0);
+            // Inversión Y: alto_mundo(200) - y_server - alto_puerta
+            this.puertaY = 200 - door.getFloat("y", 0) - door.getFloat("height", 310);
+            this.puertaWidth = door.getFloat("width", 266);
+            this.puertaHeight = door.getFloat("height", 310);
         }
 
+        if (data.has("key")) {
+            JsonValue key = data.get("key");
+            this.keyX = key.getFloat("x", 0);
+            this.keyY = 200 - key.getFloat("y", 0) - 32;
+        }
     }
 
-    // =========================================================
-    // Crea un botón transparente y con hitbox circular
-    // =========================================================
-    private TextButton crearBotonCircular(String texto, Skin skin) {
-        TextButton boton = new TextButton(texto, skin) {
-            @Override
-            public Actor hit(float x, float y, boolean touchable) {
-                // Calculamos si el toque del usuario está dentro del círculo
-                float radio = getWidth() / 2f;
-                float centroX = radio;
-                float centroY = getHeight() / 2f;
+    public void actualizarEstado(JsonValue data) {
+        if (data == null) return;
 
-                float distancia = (float) Math.sqrt(Math.pow(x - centroX, 2) + Math.pow(y - centroY, 2));
+        // 1. Obtenemos las dimensiones del mundo que vienen del servidor
+        // Si no vienen en el STATE_UPDATE, usa el valor de tu JSON (ej: 600)
+        float worldHeightServer = 600f;
+        float WORLD_HEIGHT = 600f;
 
-                if (distancia <= radio) {
-                    return super.hit(x, y, touchable); // Tocó el círculo
-                }
-                return null; // Tocó la esquina vacía (ignorar)
+        // 2. Actualizar Jugadores
+        JsonValue playersJson = data.get("players");
+        if (playersJson != null && playersJson.isArray()) {
+            jugadoresOnline.clear();
+            for (JsonValue pJson : playersJson) {
+                DatosJugador dj = new DatosJugador();
+                dj.id = pJson.getString("id");
+                dj.nickname = pJson.getString("nickname", "Player");
+
+                // X se queda igual
+                dj.x = pJson.getFloat("x");
+
+                // FÓRMULA MAESTRA: AltoTotal - Y_Servidor - Alto_Sprite
+                // Esto convierte el (0,0) Arriba-Izquierda a (0,0) Abajo-Izquierda
+                dj.y = WORLD_HEIGHT - pJson.getFloat("y") - 186;
+
+                dj.color = pJson.getString("color", "blanco").toLowerCase();
+
+                // Log para verificar: Ahora Y debería ser un número positivo (ej: 50.0)
+                Gdx.app.log("DEBUG_PLAYER", "ID: " + dj.id + " | X: " + dj.x + " | Y: " + dj.y);
+
+                jugadoresOnline.add(dj);
             }
-        };
+        }
 
-        // Transparencia al 70%
-        boton.getColor().a = 0.7f;
-
-        return boton;
-    }
-
-    private void construirUI() {
-        skin = new Skin();
-        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        pixmap.setColor(Color.WHITE);
-        pixmap.fill();
-        skin.add("white", new Texture(pixmap));
-        skin.add("default", new BitmapFont());
-
-        TextButton.TextButtonStyle estiloBoton = new TextButton.TextButtonStyle();
-        estiloBoton.up = skin.newDrawable("white", Color.DARK_GRAY);
-        estiloBoton.down = skin.newDrawable("white", Color.GRAY);
-        estiloBoton.font = skin.getFont("default");
-        skin.add("default", estiloBoton);
-
-        Table tabla = new Table();
-        tabla.setFillParent(true);
-        tabla.bottom().padBottom(20);
-
-        // Usamos nuestro nuevo método para crear los botones
-        TextButton btnIzquierda = crearBotonCircular("<", skin);
-        TextButton btnDerecha = crearBotonCircular(">", skin);
-        TextButton btnSalto = crearBotonCircular("SALTO", skin);
-
-        btnIzquierda.addListener(crearListenerBoton("left"));
-        btnDerecha.addListener(crearListenerBoton("right"));
-        btnSalto.addListener(crearListenerBoton("jump"));
-
-        // Ajustamos las medidas para que sean cuadradas (90x90), así el radio hace un círculo perfecto
-        tabla.add(btnIzquierda).width(90).height(90).padRight(20);
-        tabla.add(btnDerecha).width(90).height(90).expandX().left();
-        tabla.add(btnSalto).width(90).height(90).right().padRight(20);
-
-        stage.addActor(tabla);
-        pixmap.dispose();
-    }
-
-    private ClickListener crearListenerBoton(final String accion) {
-        return new ClickListener() {
-            @Override
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                setAccion(accion, true);
-                return true;
+        // 3. Actualizar Llave
+        if (data.has("key")) {
+            JsonValue key = data.get("key");
+            this.keyX = key.getFloat("x");
+            this.keyY = worldHeightServer - key.getFloat("y") - 32; // 32 es el alto de la llave
+            this.keyCollected = key.getBoolean("collected", false);
+        }
+        if (data.has("door")) {
+            JsonValue door = data.get("door");
+            if (door.has("x") && door.has("y")) {
+                // Forzamos la puerta a entrar en pantalla para que la veas:
+                this.puertaX = door.getFloat("x");
+                // Como el log dice -390, le sumamos para subirla al suelo
+                this.puertaY = WORLD_HEIGHT - door.getFloat("y") - 80;
             }
-            @Override
-            public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                setAccion(accion, false);
+
+            // 4. Actualizar Puerta
+        /*if (data.has("door")) {
+            JsonValue door = data.get("door");
+            // Solo intentamos leer X e Y si el objeto los trae
+            if (door.has("x") && door.has("y")) {
+                this.puertaX = door.getFloat("x");
+                this.puertaY = worldHeightServer - door.getFloat("y") - 80;
             }
-        };
+            // opened siempre suele estar
+            this. = door.getBoolean("opened", false);
+        }*/
+        }
     }
 
-    private void setAccion(String accion, boolean valor) {
-        if (accion.equals("left")) isLeftPressed = valor;
-        if (accion.equals("right")) isRightPressed = valor;
-        if (accion.equals("jump")) isJumpPressed = valor;
+    // --- RENDERIZADO ---
+
+    @Override
+    public void render(float delta) {
+        enviarInput();
+
+        Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        // Centramos la cámara en el centro del mundo (200, 100)
+       // camara.position.set(200, 100, 0);
+        camara.position.set(400, 300, 0);
+        camara.update();
+
+        batch.setProjectionMatrix(camara.combined);
+        batch.begin();
+
+        if (mapRender != null) mapRender.render(batch);
+
+        // 1. Dibujar Puerta
+        batch.draw(texturaPuerta, puertaX, puertaY, puertaWidth, puertaHeight);
+
+        // 2. Dibujar Jugadores
+        for (DatosJugador jugador : jugadoresOnline) {
+            jugador.stateTime += delta;
+
+            // Seguridad: Si el color no existe, usamos "blanco"
+            Map<String, Animation<TextureRegion>> colorAnims = animacionesPorColor.get(jugador.color);
+            if (colorAnims == null) colorAnims = animacionesPorColor.get("blanco");
+
+            Animation<TextureRegion> idle = colorAnims.get("idle");
+            TextureRegion frame = idle.getKeyFrame(jugador.stateTime);
+            Gdx.app.log("DEBUG_RENDER", "Dibujando puerta en X:" + puertaX + " Y:" + puertaY);
+
+            batch.draw(frame, jugador.x, jugador.y);
+
+            // Dibujar llave sobre el jugador que la tiene
+            if (keyHolderId != null && keyHolderId.equals(jugador.id)) {
+                batch.draw(texturaKey, jugador.x + 20, jugador.y + 100, 24, 24);
+            }
+        }
+
+        // 3. Dibujar Llave en el suelo
+        if (keyHolderId == null && !keyCollected) {
+            batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
+        }
+
+        batch.end();
+
+        stage.act(delta);
+        stage.draw();
     }
+
+    // --- GESTIÓN DE INPUTS Y UI ---
 
     private void enviarInput() {
         if (cliente != null && cliente.isOpen()) {
@@ -234,114 +250,68 @@ public class GameScreen extends ScreenAdapter {
         }
     }
 
-    // MÉTODO CORREGIDO: Recibe el objeto "data" completo del GameClient
-    public void actualizarEstado(JsonValue data) {
-        if (data == null) return;
+    private void cargarAnimaciones() {
+        String[] colores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
+        for (int i = 0; i < colores.length; i++) {
+            Texture tex = new Texture(Gdx.files.internal("media/skeleton_color" + (i + 1) + ".png"));
+            String path = "media/skeleton_color" + (i + 1) + ".png";
+            Gdx.app.log("ASSET_LOAD", "Cargando esqueleto: " + colores[i] + " desde " + path);
+            texturasCargadas.add(tex);
+            TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
+            Animation<TextureRegion> idleAnim = new Animation<>(0.20f, frames[0][0], frames[0][1], frames[0][2], frames[0][3]);
+            idleAnim.setPlayMode(Animation.PlayMode.LOOP);
 
-        // --- PARTE 1: JUGADORES ---
-        JsonValue playersJson = data.get("players");
-        if (playersJson != null && playersJson.isArray()) {
-            jugadoresOnline.clear();
-            for (JsonValue pJson : playersJson) {
-                // SEGURIDAD: Solo procesamos si existe el campo "id"
-                if (pJson.has("id")) {
-                    DatosJugador dj = new DatosJugador();
-                    dj.id = pJson.getString("id");
-                    dj.nickname = pJson.getString("nickname", "Anon");
-                    dj.x = pJson.getFloat("x", 0);
-                    dj.y = pJson.getFloat("y", 0);
-                    dj.color = pJson.getString("color", "blanco").toLowerCase();
-                    jugadoresOnline.add(dj);
-                }
-            }
+            Map<String, Animation<TextureRegion>> anims = new HashMap<>();
+            anims.put("idle", idleAnim);
+            animacionesPorColor.put(colores[i], anims);
         }
-
-        // --- PARTE 2: MUNDO (PUERTA) ---
-        JsonValue world = data.get("world");
-        if (world != null && world.has("door")) {
-            JsonValue door = world.get("door");
-            this.puertaX = door.getFloat("x", 0);
-            this.puertaY = door.getFloat("y", 0);
-            this.puertaWidth = door.getFloat("width", 50);
-            this.puertaHeight = door.getFloat("height", 50);
-
-        }
-        if (world != null && world.has("key")) {
-            JsonValue key = world.get("key");
-            this.keyX = key.getFloat("x", 0);
-            this.keyY = key.getFloat("y", 0);
-            this.keyWidth = key.getFloat("width", 32);
-            this.keyHeight = key.getFloat("height", 32);
-            this.keyCollected = key.getBoolean("collected", false);
-            if (key.has("holderId")) {
-                keyHolderId = key.getString("holderId", null);
-            }
-        }
-
     }
-    @Override
-    public void render(float delta) {
-        enviarInput();
 
-        Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+    private void construirUI() {
+        skin = new Skin();
+        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pixmap.setColor(Color.WHITE);
+        pixmap.fill();
+        skin.add("white", new Texture(pixmap));
+        skin.add("default", new BitmapFont());
 
-        // Ajuste de cámara
-        camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
-        camara.update();
+        TextButton.TextButtonStyle estilo = new TextButton.TextButtonStyle();
+        estilo.up = skin.newDrawable("white", Color.DARK_GRAY);
+        estilo.down = skin.newDrawable("white", Color.GRAY);
+        estilo.font = skin.getFont("default");
+        skin.add("default", estilo);
 
-        batch.setProjectionMatrix(camara.combined);
+        Table tabla = new Table();
+        tabla.setFillParent(true);
+        tabla.bottom().padBottom(20);
 
-        batch.begin();
+        TextButton btnL = new TextButton("<", skin);
+        TextButton btnR = new TextButton(">", skin);
+        TextButton btnJ = new TextButton("UP", skin);
 
-        // Dibujar mapa
-        if (mapRender != null) {
-            mapRender.render(batch);
-        }
+        btnL.addListener(new ClickListener() {
+            public boolean touchDown(InputEvent e, float x, float y, int p, int b) { isLeftPressed = true; return true; }
+            public void touchUp(InputEvent e, float x, float y, int p, int b) { isLeftPressed = false; }
+        });
+        btnR.addListener(new ClickListener() {
+            public boolean touchDown(InputEvent e, float x, float y, int p, int b) { isRightPressed = true; return true; }
+            public void touchUp(InputEvent e, float x, float y, int p, int b) { isRightPressed = false; }
+        });
+        btnJ.addListener(new ClickListener() {
+            public boolean touchDown(InputEvent e, float x, float y, int p, int b) { isJumpPressed = true; return true; }
+            public void touchUp(InputEvent e, float x, float y, int p, int b) { isJumpPressed = false; }
+        });
 
-        // Dibujar puerta
-        batch.draw(texturaPuerta, puertaX, puertaY, puertaWidth, puertaHeight);
-
-        // Dibujar llave si no está recogida
-        if (!keyCollected) {
-            batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
-        }
-
-        // Dibujar jugadores con animación idle
-        for (DatosJugador jugador : jugadoresOnline) {
-
-            jugador.stateTime += delta;
-
-            Animation<TextureRegion> idle = animacionesPorColor
-                .get(jugador.color)
-                .get("idle");
-
-            TextureRegion frame = idle.getKeyFrame(jugador.stateTime);
-
-            batch.draw(frame, jugador.x, jugador.y);
-
-            // Si este jugador tiene la llave, dibujarla encima
-            if (keyHolderId != null && keyHolderId.equals(jugador.id)) {
-                float offsetX = 20;
-                float offsetY = 50;
-                batch.draw(texturaKey, jugador.x + offsetX, jugador.y + offsetY, keyWidth, keyHeight);
-            }
-
-        }
-        // Si nadie tiene la llave, dibujarla en el suelo
-        if (keyHolderId == null && !keyCollected) {
-            batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
-        }
-
-        batch.end();
-
-        stage.act(delta);
-        stage.draw();
+        tabla.add(btnL).size(80);
+        tabla.add(btnR).size(80).padLeft(20).expandX().left();
+        tabla.add(btnJ).size(80).right().padRight(20);
+        stage.addActor(tabla);
+        pixmap.dispose();
     }
 
     @Override
     public void resize(int width, int height) {
-        gameViewport.update(width, height, true); // El 'true' centra la cámara temporalmente
+        gameViewport.update(width, height);
         stage.getViewport().update(width, height, true);
     }
 
@@ -349,15 +319,10 @@ public class GameScreen extends ScreenAdapter {
     public void dispose() {
         batch.dispose();
         stage.dispose();
-        if (skin != null) skin.dispose();
+        skin.dispose();
         if (mapRender != null) mapRender.dispose();
-
-        for (Texture tex : texturasCargadas) {
-            tex.dispose();
-        }
-            texturaKey.dispose();
-            texturaPuerta.dispose();
-
-
+        for (Texture t : texturasCargadas) t.dispose();
+        texturaKey.dispose();
+        texturaPuerta.dispose();
     }
 }
