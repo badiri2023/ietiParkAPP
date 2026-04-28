@@ -12,6 +12,7 @@ import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -37,36 +38,34 @@ public class GameScreen extends ScreenAdapter {
     private OrthographicCamera camara;
     private Viewport gameViewport;
 
-    // Texturas creadas en constructor (con contexto GL)
     private Texture texturaPuerta;
+    private MapRender mapRender;
 
-    // UI y controles
     private Stage stage;
     private Skin skin;
+
+    // Inputs
     private boolean isLeftPressed = false;
     private boolean isRightPressed = false;
     private boolean isJumpPressed = false;
 
-    // Puerta (valores recibidos del servidor)
-    private float puertaX = 0, puertaY = 0, puertaWidth = 0, puertaHeight = 0;
-
-    // MapRender
-    private MapRender mapRender;
-
-    // Animaciones: color -> (state -> Animation)
+    // Mundo
+    private float puertaX, puertaY, puertaWidth, puertaHeight;
     private List<Texture> texturasCargadas = new ArrayList<>();
     private Map<String, Map<String, Animation<TextureRegion>>> animacionesPorColor = new HashMap<>();
-
-    // Jugadores
     private List<DatosJugador> jugadoresOnline = new ArrayList<>();
 
+    // --- MODELO DE DATOS CON INTERPOLACIÓN ---
     private class DatosJugador {
         String id;
         String nickname;
-        float x, y;
-        float prevX, prevY;
         String color;
+        float x, y;               // Posición visual (suave)
+        float targetX, targetY;   // Posición real del servidor
         float stateTime = 0f;
+        boolean moviendose = false;
+        boolean enAire = false;
+        boolean mirandoIzquierda = false;
     }
 
     public GameScreen(Game game, GameClient cliente) {
@@ -76,121 +75,151 @@ public class GameScreen extends ScreenAdapter {
         if (this.cliente != null) this.cliente.setPantallaJuego(this);
 
         batch = new SpriteBatch();
-
         camara = new OrthographicCamera();
         gameViewport = new FitViewport(800, 480, camara);
 
         stage = new Stage(new FitViewport(800, 480));
         Gdx.input.setInputProcessor(stage);
 
-        // Crear texturas que requieren GL en constructor
         try {
             texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
+            mapRender = new MapRender();
         } catch (Exception e) {
-            System.err.println("[GameScreen] No se pudo cargar media/door.png: " + e.getMessage());
-            texturaPuerta = null;
+            Gdx.app.error("INIT", "Error cargando recursos: " + e.getMessage());
         }
 
         cargarAnimaciones();
         construirUI();
-
-        try {
-            mapRender = new MapRender();
-        } catch (Exception e) {
-            System.err.println("[GameScreen] Error inicializando MapRender: " + e.getMessage());
-            mapRender = null;
-        }
     }
 
-    /**
-     * Carga animaciones por color. Protege índices fuera de rango y crea fallbacks.
-     */
     private void cargarAnimaciones() {
-        String[] nombresColores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
-        String[] archivosPng = {
-            "media/skeleton_color1.png",
-            "media/skeleton_color2.png",
-            "media/skeleton_color3.png",
-            "media/skeleton_color4.png",
-            "media/skeleton_color5.png",
-            "media/skeleton_color6.png",
-            "media/skeleton_color7.png",
-            "media/skeleton_color8.png"
-        };
-
-        for (int i = 0; i < nombresColores.length; i++) {
-            Texture tex;
+        String[] colores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
+        for (int i = 0; i < colores.length; i++) {
             try {
-                tex = new Texture(Gdx.files.internal(archivosPng[i]));
+                Texture tex = new Texture(Gdx.files.internal("media/skeleton_color" + (i + 1) + ".png"));
                 texturasCargadas.add(tex);
+                TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
+
+                Map<String, Animation<TextureRegion>> anims = new HashMap<>();
+
+                // IDLE: Fila 0, frames 0-3
+                anims.put("idle", new Animation<>(0.2f, frames[0][0], frames[0][1], frames[0][2], frames[0][3]));
+                // JUMP: Fila 1, frames 0-5
+                anims.put("jump", new Animation<>(0.12f, frames[1][0], frames[1][1], frames[1][2], frames[1][3], frames[1][4], frames[1][5]));
+                // RUN: Fila 2, frames 0-6
+                anims.put("run", new Animation<>(0.1f, frames[2][0], frames[2][1], frames[2][2], frames[2][3], frames[2][4], frames[2][5], frames[2][6]));
+
+                for (Animation<TextureRegion> a : anims.values()) a.setPlayMode(Animation.PlayMode.LOOP);
+                animacionesPorColor.put(colores[i], anims);
             } catch (Exception e) {
-                System.err.println("[GameScreen] No se pudo cargar " + archivosPng[i] + ": " + e.getMessage());
-                continue;
+                Gdx.app.error("ANIM", "Error cargando skeleton " + (i+1));
             }
-
-            TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
-
-            // IDLE (frames 0..3) con fallback
-            Animation<TextureRegion> idle;
-            try {
-                idle = new Animation<>(0.20f, frames[0][0], frames[0][1], frames[0][2], frames[0][3]);
-                idle.setPlayMode(Animation.PlayMode.LOOP);
-            } catch (Exception e) {
-                idle = new Animation<>(0.20f, frames[0][0]);
-                idle.setPlayMode(Animation.PlayMode.LOOP);
-            }
-
-            // RUN (frames 14..20) fallback a idle
-            Animation<TextureRegion> run;
-            try {
-                run = new Animation<>(0.10f,
-                    frames[2][0], frames[2][1], frames[2][2],
-                    frames[2][3], frames[2][4], frames[2][5],frames[2][6]);
-                run.setPlayMode(Animation.PlayMode.LOOP);
-            } catch (Exception e) {
-                run = idle;
-            }
-
-            // JUMP (frames 7..11) fallback a idle
-            Animation<TextureRegion> jump;
-            try {
-                jump = new Animation<>(0.12f,
-                    frames[1][0], frames[1][1], frames[1][2],
-                    frames[1][3], frames[1][4], frames[1][5]);
-                jump.setPlayMode(Animation.PlayMode.NORMAL);
-            } catch (Exception e) {
-                jump = idle;
-            }
-
-            Map<String, Animation<TextureRegion>> anims = new HashMap<>();
-            anims.put("idle", idle);
-            anims.put("run", run);
-            anims.put("jump", jump);
-
-            animacionesPorColor.put(nombresColores[i], anims);
-        }
-
-        // fallback "blanco" si no existe
-        if (!animacionesPorColor.containsKey("blanco") && !animacionesPorColor.isEmpty()) {
-            String any = animacionesPorColor.keySet().iterator().next();
-            animacionesPorColor.put("blanco", animacionesPorColor.get(any));
         }
     }
 
-    private TextButton crearBotonCircular(String texto, Skin skin) {
-        TextButton boton = new TextButton(texto, skin) {
-            @Override
-            public Actor hit(float x, float y, boolean touchable) {
-                float radio = getWidth() / 2f;
-                float centroX = radio;
-                float centroY = getHeight() / 2f;
-                float distancia = (float) Math.sqrt(Math.pow(x - centroX, 2) + Math.pow(y - centroY, 2));
-                if (distancia <= radio) return super.hit(x, y, touchable);
-                return null;
+    public void actualizarEstado(JsonValue data) {
+        if (data == null) return;
+
+        JsonValue playersJson = data.get("players");
+        if (playersJson != null && playersJson.isArray()) {
+            for (JsonValue pJson : playersJson) {
+                String id = pJson.getString("id");
+                float sX = pJson.getFloat("x", 0);
+                float sY = pJson.getFloat("y", 0);
+
+                DatosJugador dj = null;
+                for (DatosJugador existente : jugadoresOnline) {
+                    if (existente.id.equals(id)) { dj = existente; break; }
+                }
+
+                if (dj == null) {
+                    dj = new DatosJugador();
+                    dj.id = id;
+                    dj.x = dj.targetX = sX;
+                    dj.y = dj.targetY = sY;
+                    dj.color = pJson.getString("color", "blanco").toLowerCase();
+                    jugadoresOnline.add(dj);
+                } else {
+                    // Detección de estados antes de actualizar el objetivo
+                    if (sX < dj.targetX) dj.mirandoIzquierda = true;
+                    else if (sX > dj.targetX) dj.mirandoIzquierda = false;
+
+                    dj.moviendose = Math.abs(sX - dj.targetX) > 0.5f;
+                    dj.enAire = Math.abs(sY - dj.targetY) > 0.5f;
+
+                    dj.targetX = sX;
+                    dj.targetY = sY;
+                }
+                dj.nickname = pJson.getString("nickname", "Anon");
             }
-        };
-        boton.getColor().a = 0.5f;
-        return boton;
+        }
+
+        JsonValue door = data.get("door");
+        if (door != null) {
+            this.puertaX = door.getFloat("x", 0);
+            this.puertaY = door.getFloat("y", 0);
+            this.puertaWidth = door.getFloat("width", 100);
+            this.puertaHeight = door.getFloat("height", 150);
+        }
+    }
+
+    @Override
+    public void render(float delta) {
+        enviarInput();
+
+        Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+
+        camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
+        camara.update();
+
+        batch.setProjectionMatrix(camara.combined);
+        batch.begin();
+
+        if (mapRender != null) mapRender.render(batch);
+
+        // Puerta
+        if (texturaPuerta != null) {
+            batch.draw(texturaPuerta, puertaX, toScreenY(puertaY, puertaHeight), puertaWidth, puertaHeight);
+        }
+
+        // Jugadores
+        for (DatosJugador dj : jugadoresOnline) {
+            dj.stateTime += delta;
+
+            // LERP: Suaviza el movimiento entre frames del servidor
+            dj.x = MathUtils.lerp(dj.x, dj.targetX, 0.25f);
+            dj.y = MathUtils.lerp(dj.y, dj.targetY, 0.25f);
+
+            String animKey = "idle";
+            if (dj.enAire) animKey = "jump";
+            else if (dj.moviendose) animKey = "run";
+
+            Map<String, Animation<TextureRegion>> animMap = animacionesPorColor.getOrDefault(dj.color, animacionesPorColor.get("blanco"));
+            TextureRegion frame = animMap.get(animKey).getKeyFrame(dj.stateTime, true);
+
+            // Orientación (Flip)
+            if (dj.mirandoIzquierda && !frame.isFlipX()) frame.flip(true, false);
+            else if (!dj.mirandoIzquierda && frame.isFlipX()) frame.flip(true, false);
+
+            batch.draw(frame, dj.x, toScreenY(dj.y, frame.getRegionHeight()));
+        }
+
+        batch.end();
+        stage.act(delta);
+        stage.draw();
+    }
+
+    private float toScreenY(float serverY, float height) {
+        if (mapRender == null) return serverY;
+        return mapRender.getMapHeightPixels() - serverY - height;
+    }
+
+    private void enviarInput() {
+        if (cliente != null && cliente.isOpen()) {
+            String json = "{\"type\":\"INPUT\",\"left\":" + isLeftPressed + ",\"right\":" + isRightPressed + ",\"jump\":" + isJumpPressed + "}";
+            cliente.send(json);
+        }
     }
 
     private void construirUI() {
@@ -201,194 +230,53 @@ public class GameScreen extends ScreenAdapter {
         skin.add("white", new Texture(pixmap));
         skin.add("default", new BitmapFont());
 
-        TextButton.TextButtonStyle estiloBoton = new TextButton.TextButtonStyle();
-        estiloBoton.up = skin.newDrawable("white", Color.DARK_GRAY);
-        estiloBoton.down = skin.newDrawable("white", Color.GRAY);
-        estiloBoton.font = skin.getFont("default");
-        skin.add("default", estiloBoton);
+        TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
+        style.up = skin.newDrawable("white", Color.DARK_GRAY);
+        style.down = skin.newDrawable("white", Color.GRAY);
+        style.font = skin.getFont("default");
+        skin.add("default", style);
 
-        Table tabla = new Table();
-        tabla.setFillParent(true);
-        tabla.bottom().padBottom(20);
+        Table table = new Table();
+        table.setFillParent(true);
+        table.bottom().padBottom(20);
 
-        TextButton btnIzquierda = crearBotonCircular("<", skin);
-        TextButton btnDerecha = crearBotonCircular(">", skin);
-        TextButton btnSalto = crearBotonCircular("SALTO", skin);
+        TextButton btnL = new TextButton("<", skin);
+        TextButton btnR = new TextButton(">", skin);
+        TextButton btnJ = new TextButton("JUMP", skin);
 
-        btnIzquierda.addListener(crearListenerBoton("left"));
-        btnDerecha.addListener(crearListenerBoton("right"));
-        btnSalto.addListener(crearListenerBoton("jump"));
+        btnL.addListener(new ClickListener(){
+            public boolean touchDown(InputEvent e, float x, float y, int p, int b){ isLeftPressed = true; return true; }
+            public void touchUp(InputEvent e, float x, float y, int p, int b){ isLeftPressed = false; }
+        });
+        btnR.addListener(new ClickListener(){
+            public boolean touchDown(InputEvent e, float x, float y, int p, int b){ isRightPressed = true; return true; }
+            public void touchUp(InputEvent e, float x, float y, int p, int b){ isRightPressed = false; }
+        });
+        btnJ.addListener(new ClickListener(){
+            public boolean touchDown(InputEvent e, float x, float y, int p, int b){ isJumpPressed = true; return true; }
+            public void touchUp(InputEvent e, float x, float y, int p, int b){ isJumpPressed = false; }
+        });
 
-        tabla.add(btnIzquierda).width(90).height(90).padRight(20);
-        tabla.add(btnDerecha).width(90).height(90).expandX().left();
-        tabla.add(btnSalto).width(90).height(90).right().padRight(20);
-
-        stage.addActor(tabla);
+        table.add(btnL).size(80);
+        table.add(btnR).size(80).padLeft(10).expandX().left();
+        table.add(btnJ).size(100).right().padRight(20);
+        stage.addActor(table);
         pixmap.dispose();
-    }
-
-    private ClickListener crearListenerBoton(final String accion) {
-        return new ClickListener() {
-            @Override
-            public boolean touchDown(InputEvent event, float x, float y, int pointer, int button) {
-                setAccion(accion, true);
-                return true;
-            }
-            @Override
-            public void touchUp(InputEvent event, float x, float y, int pointer, int button) {
-                setAccion(accion, false);
-            }
-        };
-    }
-
-    private void setAccion(String accion, boolean valor) {
-        if ("left".equals(accion)) isLeftPressed = valor;
-        if ("right".equals(accion)) isRightPressed = valor;
-        if ("jump".equals(accion)) isJumpPressed = valor;
-    }
-
-    private void enviarInput() {
-        if (cliente != null && cliente.isOpen()) {
-            String json = "{\"type\":\"INPUT\","
-                + "\"left\":"  + isLeftPressed  + ","
-                + "\"right\":" + isRightPressed + ","
-                + "\"jump\":"  + isJumpPressed  + "}";
-            cliente.send(json);
-        }
-    }
-
-    /**
-     * Actualiza jugadores y puerta. Preserva prevX/prevY para detectar movimiento.
-     */
-    public void actualizarEstado(JsonValue data) {
-        if (data == null) return;
-
-        Map<String, DatosJugador> existing = new HashMap<>();
-        for (DatosJugador d : jugadoresOnline) existing.put(d.id, d);
-
-        List<DatosJugador> newList = new ArrayList<>();
-        JsonValue playersJson = data.get("players");
-        if (playersJson != null && playersJson.isArray()) {
-            for (JsonValue pJson : playersJson) {
-                if (!pJson.has("id")) continue;
-                String id = pJson.getString("id");
-                float x = pJson.getFloat("x", 0);
-                float y = pJson.getFloat("y", 0);
-                String color = pJson.getString("color", "blanco").toLowerCase();
-                String nickname = pJson.getString("nickname", "Anon");
-
-                DatosJugador dj = existing.get(id);
-                if (dj == null) {
-                    dj = new DatosJugador();
-                    dj.id = id;
-                    dj.nickname = nickname;
-                    dj.x = x;
-                    dj.y = y;
-                    dj.prevX = x;
-                    dj.prevY = y;
-                    dj.color = color;
-                    dj.stateTime = 0f;
-                } else {
-                    dj.prevX = dj.x;
-                    dj.prevY = dj.y;
-                    dj.x = x;
-                    dj.y = y;
-                    dj.nickname = nickname;
-                    dj.color = color;
-                }
-                newList.add(dj);
-            }
-        }
-        jugadoresOnline = newList;
-
-        JsonValue door = data.get("door");
-        if (door != null) {
-            this.puertaX = door.getFloat("x", 0);
-            this.puertaY = door.getFloat("y", 0);
-            this.puertaWidth = door.getFloat("width", (texturaPuerta != null ? texturaPuerta.getWidth() : 50));
-            this.puertaHeight = door.getFloat("height", (texturaPuerta != null ? texturaPuerta.getHeight() : 50));
-        }
-    }
-
-    private float toScreenY(float serverY, float spriteHeight) {
-        if (mapRender == null) return serverY;
-        return mapRender.getMapHeightPixels() - serverY - spriteHeight;
-    }
-
-    @Override
-    public void render(float delta) {
-        try {
-            enviarInput();
-
-            Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
-            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-            camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
-            camara.update();
-
-            batch.setProjectionMatrix(camara.combined);
-
-            batch.begin();
-
-            if (mapRender != null) mapRender.render(batch);
-
-            if (texturaPuerta != null && puertaWidth > 0 && puertaHeight > 0) {
-                float drawDoorY = toScreenY(puertaY, puertaHeight);
-                batch.draw(texturaPuerta, puertaX, drawDoorY, puertaWidth, puertaHeight);
-            }
-
-            for (DatosJugador jugador : jugadoresOnline) {
-                jugador.stateTime += delta;
-
-                float dx = jugador.x - jugador.prevX;
-                float dy = jugador.y - jugador.prevY;
-
-                String anim = "idle";
-                if (Math.abs(dy) > 1f) anim = "jump";
-                else if (Math.abs(dx) > 1f) anim = "run";
-
-                Map<String, Animation<TextureRegion>> animMap = animacionesPorColor.get(jugador.color);
-                if (animMap == null) animMap = animacionesPorColor.get("blanco");
-                if (animMap == null) continue;
-
-                Animation<TextureRegion> animation = animMap.get(anim);
-                if (animation == null) animation = animMap.get("idle");
-                if (animation == null) continue;
-
-                TextureRegion frame = animation.getKeyFrame(jugador.stateTime, true);
-
-                float drawY = toScreenY(jugador.y, frame.getRegionHeight());
-                batch.draw(frame, jugador.x, drawY);
-
-                jugador.prevX = jugador.x;
-                jugador.prevY = jugador.y;
-            }
-
-            batch.end();
-
-            stage.act(delta);
-            stage.draw();
-        } catch (Exception e) {
-            System.err.println("[GameScreen] Exception in render: " + e.getMessage());
-            e.printStackTrace();
-        }
     }
 
     @Override
     public void resize(int width, int height) {
-        gameViewport.update(width, height, true);
+        gameViewport.update(width, height);
         stage.getViewport().update(width, height, true);
     }
 
     @Override
     public void dispose() {
-        try { batch.dispose(); } catch (Exception ignored) {}
-        try { stage.dispose(); } catch (Exception ignored) {}
+        batch.dispose();
+        stage.dispose();
         if (skin != null) skin.dispose();
         if (mapRender != null) mapRender.dispose();
-        if (texturaPuerta != null) try { texturaPuerta.dispose(); } catch (Exception ignored) {}
-        for (Texture tex : texturasCargadas) {
-            try { tex.dispose(); } catch (Exception ignored) {}
-        }
+        for (Texture t : texturasCargadas) t.dispose();
+        if (texturaPuerta != null) texturaPuerta.dispose();
     }
 }
