@@ -280,19 +280,18 @@ public class GameScreen extends ScreenAdapter {
             TextureRegion frame = anim.getKeyFrame(jugador.stateTime, true);
 
             // --- CORRECCIÓN DE POSICIÓN ---
-            // 1. Compensación por reducir la hitbox en el server (186 original - 130 nueva = 56px de diferencia)
             // Esto evita que el personaje parezca "hundido" en el suelo.
             float correccionHitbox = 26f;
 
-            // 2. Ajuste visual para la animación de correr (si tu sprite lo requiere)
+            // 2. Ajuste visual para la animación de correr
             float ajusteAnimacion = (animKey.equals("run")) ? -40f : 0f;
 
             float finalOffsetY = correccionHitbox + ajusteAnimacion;
 
-            // Dibujar esqueleto (usamos 112 de ancho para que no se vea flaco, solo la hitbox es estrecha)
+            // Dibujar esqueleto
             batch.draw(frame,
                 jugador.mirandoIzquierda ? jugador.x + 112 : jugador.x,
-                jugador.y + finalOffsetY, // Aplicamos el offset aquí
+                jugador.y + finalOffsetY,
                 jugador.mirandoIzquierda ? -112 : 112,
                 186);
 
@@ -358,6 +357,7 @@ public class GameScreen extends ScreenAdapter {
 
     private void construirUI() {
         skin = new Skin();
+
         Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         pixmap.setColor(Color.WHITE);
         pixmap.fill();
@@ -365,9 +365,15 @@ public class GameScreen extends ScreenAdapter {
         skin.add("default", new BitmapFont());
 
         TextButton.TextButtonStyle estilo = new TextButton.TextButtonStyle();
-        estilo.up = skin.newDrawable("white", Color.DARK_GRAY);
-        estilo.down = skin.newDrawable("white", Color.GRAY);
+
+        Color colorTransparente = new Color(0.2f, 0.2f, 0.2f, 0.5f);
+        Color colorPulsado = new Color(0.4f, 0.4f, 0.4f, 0.7f);
+
+        estilo.up = skin.newDrawable("white", colorTransparente);
+        estilo.down = skin.newDrawable("white", colorPulsado);
         estilo.font = skin.getFont("default");
+        estilo.fontColor = new Color(1, 1, 1, 0.8f);
+
         skin.add("default", estilo);
 
         Table tabla = new Table();
@@ -391,9 +397,9 @@ public class GameScreen extends ScreenAdapter {
             public void touchUp(InputEvent e, float x, float y, int p, int b) { isJumpPressed = false; }
         });
 
-        tabla.add(btnL).size(80);
-        tabla.add(btnR).size(80).padLeft(20).expandX().left();
-        tabla.add(btnJ).size(80).right().padRight(20);
+        tabla.add(btnL).size(60);
+        tabla.add(btnR).size(60).padLeft(20).expandX().left();
+        tabla.add(btnJ).size(60).right().padRight(20);
         stage.addActor(tabla);
         pixmap.dispose();
     }
