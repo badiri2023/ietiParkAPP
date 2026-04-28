@@ -64,9 +64,13 @@ public class GameScreen extends ScreenAdapter {
     private class DatosJugador {
         String id;
         String nickname;
-        float x, y;
         String color;
+        float x, y;               // Posición visual (suave)
+        float targetX, targetY;   // Posición real del servidor
         float stateTime = 0f;
+        boolean moviendose = false;
+        boolean enAire = false;
+        boolean mirandoIzquierda = false;
     }
 
     public GameScreen(Game game, GameClient cliente, JsonValue initialData) {
@@ -133,28 +137,45 @@ public class GameScreen extends ScreenAdapter {
         // 2. Actualizar Jugadores
         JsonValue playersJson = data.get("players");
         if (playersJson != null && playersJson.isArray()) {
-            jugadoresOnline.clear();
+            List<DatosJugador> nuevaLista = new ArrayList<>();
+
             for (JsonValue pJson : playersJson) {
-                DatosJugador dj = new DatosJugador();
-                dj.id = pJson.getString("id");
+                String id = pJson.getString("id");
+                float sX = pJson.getFloat("x");
+                float sY = WORLD_HEIGHT - pJson.getFloat("y") - 160;
+
+                // Buscar si el jugador ya existía
+                DatosJugador dj = null;
+                for (DatosJugador existente : jugadoresOnline) {
+                    if (existente.id.equals(id)) {
+                        dj = existente;
+                        break;
+                    }
+                }
+
+                if (dj == null) {
+                    dj = new DatosJugador();
+                    dj.id = id;
+                    dj.x = dj.targetX = sX;
+                    dj.y = dj.targetY = sY;
+                } else {
+                    // DETECCIÓN DE MOVIMIENTO Y SALTO
+                    if (sX < dj.targetX) dj.mirandoIzquierda = true;
+                    else if (sX > dj.targetX) dj.mirandoIzquierda = false;
+
+                    dj.moviendose = Math.abs(sX - dj.targetX) > 0.5f;
+                    dj.enAire = Math.abs(sY - dj.targetY) > 0.5f;
+
+                    dj.targetX = sX;
+                    dj.targetY = sY;
+                }
+
                 dj.nickname = pJson.getString("nickname", "Player");
-
-                // X se queda igual
-                dj.x = pJson.getFloat("x");
-
-                // FÓRMULA MAESTRA: AltoTotal - Y_Servidor - Alto_Sprite
-                // Esto convierte el (0,0) Arriba-Izquierda a (0,0) Abajo-Izquierda
-                dj.y = WORLD_HEIGHT - pJson.getFloat("y") - 160;
-
                 dj.color = pJson.getString("color", "blanco").toLowerCase();
-
-                // Log para verificar: Ahora Y debería ser un número positivo (ej: 50.0)
-                Gdx.app.log("DEBUG_PLAYER", "ID: " + dj.id + " | X: " + dj.x + " | Y: " + dj.y);
-
-                jugadoresOnline.add(dj);
+                nuevaLista.add(dj);
             }
+            jugadoresOnline = nuevaLista;
         }
-
         // 3. Actualizar Llave
         if (data.has("key")) {
             JsonValue key = data.get("key");
@@ -207,33 +228,34 @@ public class GameScreen extends ScreenAdapter {
         // 1. Dibujar Puerta
         batch.draw(texturaPuerta, puertaX, puertaY, puertaWidth, puertaHeight);
 
-        // 2. Dibujar Jugadores
+        // Dibujar Jugadores
         for (DatosJugador jugador : jugadoresOnline) {
             jugador.stateTime += delta;
 
-            // Seguridad: Si el color no existe, usamos "blanco"
-            Map<String, Animation<TextureRegion>> colorAnims = animacionesPorColor.get(jugador.color);
-            if (colorAnims == null) colorAnims = animacionesPorColor.get("blanco");
+            // SUAVIZADO (Lerp): La x visual persigue a la targetX del servidor
+            jugador.x = com.badlogic.gdx.math.MathUtils.lerp(jugador.x, jugador.targetX, 0.25f);
+            jugador.y = com.badlogic.gdx.math.MathUtils.lerp(jugador.y, jugador.targetY, 0.25f);
 
-            Animation<TextureRegion> idle = colorAnims.get("idle");
-            TextureRegion frame = idle.getKeyFrame(jugador.stateTime);
-            Gdx.app.log("DEBUG_RENDER", "Dibujando puerta en X:" + puertaX + " Y:" + puertaY);
+            // Selección de animación
+            String animKey = "idle";
+            if (jugador.enAire) animKey = "jump";
+            else if (jugador.moviendose) animKey = "run";
+
+            Map<String, Animation<TextureRegion>> colorAnims = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco"));
+            TextureRegion frame = colorAnims.get(animKey).getKeyFrame(jugador.stateTime);
+
+            // FLIP (Mirar a izquierda/derecha)
+            if (jugador.mirandoIzquierda && !frame.isFlipX()) frame.flip(true, false);
+            else if (!jugador.mirandoIzquierda && frame.isFlipX()) frame.flip(true, false);
 
             batch.draw(frame, jugador.x, jugador.y);
-
-            // Dibujar llave sobre el jugador que la tiene
-            if (keyHolderId != null && keyHolderId.equals(jugador.id)) {
-                batch.draw(texturaKey, jugador.x + 20, jugador.y + 100, 24, 24);
-            }
         }
-
         // 3. Dibujar Llave en el suelo
         if (keyHolderId == null && !keyCollected) {
             batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
         }
 
         batch.end();
-
         stage.act(delta);
         stage.draw();
     }
@@ -254,15 +276,19 @@ public class GameScreen extends ScreenAdapter {
         String[] colores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
         for (int i = 0; i < colores.length; i++) {
             Texture tex = new Texture(Gdx.files.internal("media/skeleton_color" + (i + 1) + ".png"));
-            String path = "media/skeleton_color" + (i + 1) + ".png";
-            Gdx.app.log("ASSET_LOAD", "Cargando esqueleto: " + colores[i] + " desde " + path);
             texturasCargadas.add(tex);
             TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
-            Animation<TextureRegion> idleAnim = new Animation<>(0.20f, frames[0][0], frames[0][1], frames[0][2], frames[0][3]);
-            idleAnim.setPlayMode(Animation.PlayMode.LOOP);
 
             Map<String, Animation<TextureRegion>> anims = new HashMap<>();
-            anims.put("idle", idleAnim);
+
+            // IDLE: Fila 0, frames 0-3
+            anims.put("idle", new Animation<>(0.2f, frames[0][0], frames[0][1], frames[0][2], frames[0][3]));
+            // JUMP: Fila 1, frames 0-5
+            anims.put("jump", new Animation<>(0.12f, frames[1][0], frames[1][1], frames[1][2], frames[1][3], frames[1][4], frames[1][5]));
+            // RUN: Fila 2, frames 0-6
+            anims.put("run", new Animation<>(0.1f, frames[2][0], frames[2][1], frames[2][2], frames[2][3], frames[2][4], frames[2][5], frames[2][6]));
+
+            for (Animation<TextureRegion> a : anims.values()) a.setPlayMode(Animation.PlayMode.LOOP);
             animacionesPorColor.put(colores[i], anims);
         }
     }
