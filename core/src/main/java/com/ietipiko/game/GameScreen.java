@@ -178,11 +178,21 @@ public class GameScreen extends ScreenAdapter {
         }
 
         // 2. Actualizar Llave
-        if (data.has("key")) {
+        if (data.hasChild("key")) {
             JsonValue key = data.get("key");
-            this.keyX = key.getFloat("x");
-            this.keyY = worldHeightServer - key.getFloat("y") - 32;
+            this.keyX = key.getFloat("x", 0);
+            this.keyY = WORLD_HEIGHT - key.getFloat("y", 0) - 32;
             this.keyCollected = key.getBoolean("collected", false);
+
+            // Buscamos el hijo "holderId"
+            JsonValue holder = key.get("holderId");
+
+            // Si el hijo existe y su valor no es el literal 'null' de JSON
+            if (holder != null && !holder.isNull()) {
+                this.keyHolderId = holder.asString();
+            } else {
+                this.keyHolderId = null;
+            }
         }
 
         // 3. Actualizar Puerta
@@ -215,17 +225,28 @@ public class GameScreen extends ScreenAdapter {
         batch.setProjectionMatrix(camara.combined);
         batch.begin();
 
+        // CAPA 1: LLAVE EN EL SUELO (Solo si nadie la tiene)
+        if (keyHolderId == null && !keyCollected) {
+            batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
+        }
+
+        // CAPA 2: EL MAPA (Base del escenario)
         if (mapRender != null) mapRender.render(batch);
 
-        // --- 1. DIBUJAR PUERTA ANIMADA ---
+        // CAPA 3: LA PUERTA (Sobre el mapa)
         if (puertaAbierta) {
-            doorStateTime += delta; // Si está abierta, empezamos a correr la animación
+            doorStateTime += delta;
         }
         TextureRegion currentDoorFrame = animacionPuerta.getKeyFrame(doorStateTime);
-        batch.draw(currentDoorFrame, puertaX, puertaY, puertaWidth, puertaHeight);
 
+        float escala = 0.7f;
+        float anchoEscalado = puertaWidth * escala;
+        float altoEscalado = puertaHeight * escala;
+        float offsetPuertaX = -80f;
 
-        // --- 2. DIBUJAR JUGADORES ---
+        batch.draw(currentDoorFrame, puertaX + offsetPuertaX, puertaY, anchoEscalado, altoEscalado);
+
+        // CAPA 4: JUGADORES Y LLAVE "PEGADA"
         for (DatosJugador jugador : jugadoresOnline) {
             jugador.stateTime += delta;
 
@@ -233,31 +254,32 @@ public class GameScreen extends ScreenAdapter {
             jugador.y = MathUtils.lerp(jugador.y, jugador.targetY, 0.30f);
 
             String animKey = (jugador.enAire) ? "jump" : (jugador.moviendose ? "run" : "idle");
-
             Animation<TextureRegion> anim = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco")).get(animKey);
             TextureRegion frame = anim.getKeyFrame(jugador.stateTime, true);
 
-            float offsetY = 0f;
-            if (animKey.equals("run")) {
-                offsetY = -40f; // Tu ajuste para que no flote al correr
-            }
+            float offsetY = (animKey.equals("run")) ? -40f : 0f;
 
+            // Dibujar esqueleto
             batch.draw(frame,
                 jugador.mirandoIzquierda ? jugador.x + 112 : jugador.x,
                 jugador.y + offsetY,
                 jugador.mirandoIzquierda ? -112 : 112,
                 186);
-        }
 
-        // --- 3. DIBUJAR LLAVE ---
-        if (keyHolderId == null && !keyCollected) {
-            batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
+            // Dibujar llave sobre la cabeza (solo si este jugador es el holder)
+            if (keyHolderId != null && jugador.id.equals(keyHolderId)) {                float ajusteCorrer = animKey.equals("run") ? 40f : 0f;
+                float llaveX = jugador.x + 40; // Centrada respecto al cuerpo
+                float llaveY = jugador.y + 186 + 10 + offsetY + ajusteCorrer; // Sobre la cabeza
+                batch.draw(texturaKey, llaveX, llaveY, keyWidth, keyHeight);
+            }
         }
 
         batch.end();
         stage.act(delta);
         stage.draw();
     }
+
+
 
     // --- GESTIÓN DE INPUTS Y UI ---
 
