@@ -12,6 +12,7 @@ import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -229,27 +230,41 @@ public class GameScreen extends ScreenAdapter {
         batch.draw(texturaPuerta, puertaX, puertaY, puertaWidth, puertaHeight);
 
         // Dibujar Jugadores
+// Dibujar Jugadores
         for (DatosJugador jugador : jugadoresOnline) {
             jugador.stateTime += delta;
 
-            // SUAVIZADO (Lerp): La x visual persigue a la targetX del servidor
-            jugador.x = com.badlogic.gdx.math.MathUtils.lerp(jugador.x, jugador.targetX, 0.25f);
-            jugador.y = com.badlogic.gdx.math.MathUtils.lerp(jugador.y, jugador.targetY, 0.25f);
+            // Movimiento suave
+            jugador.x = MathUtils.lerp(jugador.x, jugador.targetX, 0.20f);
+            jugador.y = MathUtils.lerp(jugador.y, jugador.targetY, 0.30f);
 
-            // Selección de animación
-            String animKey = "idle";
-            if (jugador.enAire) animKey = "jump";
-            else if (jugador.moviendose) animKey = "run";
+            // Lógica de estado
+            String animKey = (jugador.enAire) ? "jump" : (jugador.moviendose ? "run" : "idle");
 
-            Map<String, Animation<TextureRegion>> colorAnims = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco"));
-            TextureRegion frame = colorAnims.get(animKey).getKeyFrame(jugador.stateTime);
+            // Dibujado seguro
+            Animation<TextureRegion> anim = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco")).get(animKey);
+            TextureRegion frame = anim.getKeyFrame(jugador.stateTime, true);
 
-            // FLIP (Mirar a izquierda/derecha)
-            if (jugador.mirandoIzquierda && !frame.isFlipX()) frame.flip(true, false);
-            else if (!jugador.mirandoIzquierda && frame.isFlipX()) frame.flip(true, false);
+            // --- EL TRUCO DEL OFFSET (Compensación) ---
+            float offsetY = 0f;
 
-            batch.draw(frame, jugador.x, jugador.y);
+            if (animKey.equals("run")) {
+                // Restamos píxeles para "bajar" al personaje.
+                // Prueba con -10f, -15f o -20f hasta que los pies toquen el suelo.
+                offsetY = -40f;
+            } else if (animKey.equals("jump")) {
+                // Si notas que al saltar también flota raro o se hunde, puedes ajustarlo aquí
+                offsetY = 0f;
+            }
+
+            // Usamos el draw con flip incluido y le sumamos el offsetY a la posición Y
+            batch.draw(frame,
+                jugador.mirandoIzquierda ? jugador.x + 112 : jugador.x, // Ajuste X por el Flip
+                jugador.y + offsetY,                                    // Ajuste Y para que no flote
+                jugador.mirandoIzquierda ? -112 : 112,                  // Ancho (Negativo hace Flip)
+                186);                                                   // Alto
         }
+
         // 3. Dibujar Llave en el suelo
         if (keyHolderId == null && !keyCollected) {
             batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
@@ -284,7 +299,7 @@ public class GameScreen extends ScreenAdapter {
             // IDLE: Fila 0, frames 0-3
             anims.put("idle", new Animation<>(0.2f, frames[0][0], frames[0][1], frames[0][2], frames[0][3]));
             // JUMP: Fila 1, frames 0-5
-            anims.put("jump", new Animation<>(0.12f, frames[1][0], frames[1][1], frames[1][2], frames[1][3], frames[1][4], frames[1][5]));
+            anims.put("jump", new Animation<>(0.12f, frames[1][0], frames[1][1], frames[1][2], frames[1][3], frames[1][4]));
             // RUN: Fila 2, frames 0-6
             anims.put("run", new Animation<>(0.1f, frames[2][0], frames[2][1], frames[2][2], frames[2][3], frames[2][4], frames[2][5], frames[2][6]));
 
