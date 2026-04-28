@@ -127,8 +127,8 @@ public class GameScreen extends ScreenAdapter {
 
         // 1. Obtenemos las dimensiones del mundo que vienen del servidor
         // Si no vienen en el STATE_UPDATE, usa el valor de tu JSON (ej: 600)
-        float worldHeightServer = 600f;
-        float WORLD_HEIGHT = 600f;
+        float worldHeightServer = 400f;
+        float WORLD_HEIGHT = 400f;
 
         // 2. Actualizar Jugadores
         JsonValue playersJson = data.get("players");
@@ -144,7 +144,7 @@ public class GameScreen extends ScreenAdapter {
 
                 // FÓRMULA MAESTRA: AltoTotal - Y_Servidor - Alto_Sprite
                 // Esto convierte el (0,0) Arriba-Izquierda a (0,0) Abajo-Izquierda
-                dj.y = WORLD_HEIGHT - pJson.getFloat("y") - 186;
+                dj.y = WORLD_HEIGHT - pJson.getFloat("y") - 160;
 
                 dj.color = pJson.getString("color", "blanco").toLowerCase();
 
