@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -35,7 +36,7 @@ public class GameScreen extends ScreenAdapter {
 
     private OrthographicCamera camara;
     private Viewport gameViewport;
-
+    private Texture texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
     // INTERFAZ Y CONTROLES
     private Stage stage;
     private Skin skin;
@@ -43,13 +44,12 @@ public class GameScreen extends ScreenAdapter {
     private boolean isRightPressed = false;
     private boolean isJumpPressed = false;
     private float puertaX, puertaY, puertaWidth, puertaHeight;
-    private Texture texturaPuerta; // No olvides cargarla en cargarAnimaciones()
     // MAPA
     private MapRender mapRender;
 
     // SISTEMA DE COLORES
     private List<Texture> texturasCargadas = new ArrayList<>();
-    private Map<String, TextureRegion> animacionesPorColor = new HashMap<>();
+    private Map<String, Map<String, Animation<TextureRegion>>> animacionesPorColor = new HashMap<>();
 
     private List<DatosJugador> jugadoresOnline = new ArrayList<>();
 
@@ -57,10 +57,12 @@ public class GameScreen extends ScreenAdapter {
     private class DatosJugador {
         String id;
         String nickname;
-        float x;
-        float y;
+        float x, y;
+        float prevX, prevY;
         String color;
+        float stateTime = 0;
     }
+
 
     public GameScreen(Game game, GameClient cliente) {
         this.game = game;
@@ -86,7 +88,6 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void cargarAnimaciones() {
-        // CAMBIO: Todo en minúsculas para coincidir con "colors.js" del servidor
         String[] nombresColores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
         String[] archivosPng = {
             "media/skeleton_color1.png",
@@ -100,11 +101,35 @@ public class GameScreen extends ScreenAdapter {
         };
 
         for (int i = 0; i < nombresColores.length; i++) {
+
             Texture tex = new Texture(Gdx.files.internal(archivosPng[i]));
             texturasCargadas.add(tex);
 
             TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
-            animacionesPorColor.put(nombresColores[i], frames[0][0]);
+
+            // IDLE (frames 0–3)
+            Animation<TextureRegion> idle = new Animation<>(0.20f,
+                frames[0][0], frames[0][1], frames[0][2], frames[0][3]);
+            idle.setPlayMode(Animation.PlayMode.LOOP);
+
+            // RUN (frames 14–20)
+            Animation<TextureRegion> run = new Animation<>(0.10f,
+                frames[0][14], frames[0][15], frames[0][16],
+                frames[0][17], frames[0][18], frames[0][19], frames[0][20]);
+            run.setPlayMode(Animation.PlayMode.LOOP);
+
+            // JUMP (frames 7–11)
+            Animation<TextureRegion> jump = new Animation<>(0.12f,
+                frames[0][7], frames[0][8], frames[0][9],
+                frames[0][10], frames[0][11]);
+            jump.setPlayMode(Animation.PlayMode.NORMAL);
+
+            Map<String, Animation<TextureRegion>> anims = new HashMap<>();
+            anims.put("idle", idle);
+            anims.put("run", run);
+            anims.put("jump", jump);
+
+            animacionesPorColor.put(nombresColores[i], anims);
         }
     }
 
@@ -223,16 +248,22 @@ public class GameScreen extends ScreenAdapter {
             }
         }
 
-        // --- PARTE 2: MUNDO (PUERTA) ---
-        JsonValue world = data.get("world");
-        if (world != null && world.has("door")) {
-            JsonValue door = world.get("door");
+        // --- PUERTA ---
+        JsonValue door = data.get("door");
+        if (door != null) {
             this.puertaX = door.getFloat("x", 0);
             this.puertaY = door.getFloat("y", 0);
             this.puertaWidth = door.getFloat("width", 50);
             this.puertaHeight = door.getFloat("height", 50);
         }
+
     }
+
+    private float toScreenY(float serverY, float spriteHeight) {
+        float mapHeightPixels = mapRender.getMapHeightPixels();
+        return mapHeightPixels - serverY - spriteHeight;
+    }
+
     @Override
     public void render(float delta) {
         enviarInput();
@@ -240,8 +271,6 @@ public class GameScreen extends ScreenAdapter {
         Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // CAMBIO DE CÁMARA: Empujamos la cámara hacia abajo (-80 px)
-        // para que el mapa se vea más arriba en la pantalla.
         camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
         camara.update();
 
@@ -254,13 +283,33 @@ public class GameScreen extends ScreenAdapter {
         }
 
         for (DatosJugador jugador : jugadoresOnline) {
-            TextureRegion texturaJugador = animacionesPorColor.get(jugador.color);
-            if (texturaJugador == null) {
-                // CAMBIO: Valor por defecto en minúscula
-                texturaJugador = animacionesPorColor.get("blanco");
+
+            jugador.stateTime += delta;
+
+            float dx = jugador.x - jugador.prevX;
+            float dy = jugador.y - jugador.prevY;
+
+            String anim = "idle";
+
+            if (Math.abs(dy) > 1f) {
+                anim = "jump";
+            } else if (Math.abs(dx) > 1f) {
+                anim = "run";
             }
-            batch.draw(texturaJugador, jugador.x, jugador.y);
+
+            Animation<TextureRegion> animation =
+                animacionesPorColor.get(jugador.color).get(anim);
+
+            TextureRegion frame = animation.getKeyFrame(jugador.stateTime);
+
+            float drawY = toScreenY(jugador.y, frame.getRegionHeight());
+            batch.draw(frame, jugador.x, drawY);
+
+            // actualizar prevX/prevY
+            jugador.prevX = jugador.x;
+            jugador.prevY = jugador.y;
         }
+
 
         batch.end();
 
