@@ -144,8 +144,8 @@ public class GameScreen extends ScreenAdapter {
             Animation<TextureRegion> run;
             try {
                 run = new Animation<>(0.10f,
-                    frames[0][14], frames[0][15], frames[0][16],
-                    frames[0][17], frames[0][18], frames[0][19], frames[0][20]);
+                    frames[2][0], frames[2][1], frames[2][2],
+                    frames[2][3], frames[2][4], frames[2][5],frames[2][6]);
                 run.setPlayMode(Animation.PlayMode.LOOP);
             } catch (Exception e) {
                 run = idle;
@@ -155,8 +155,8 @@ public class GameScreen extends ScreenAdapter {
             Animation<TextureRegion> jump;
             try {
                 jump = new Animation<>(0.12f,
-                    frames[0][7], frames[0][8], frames[0][9],
-                    frames[0][10], frames[0][11]);
+                    frames[1][0], frames[1][1], frames[1][2],
+                    frames[1][3], frames[1][4], frames[1][5]);
                 jump.setPlayMode(Animation.PlayMode.NORMAL);
             } catch (Exception e) {
                 jump = idle;
