@@ -54,7 +54,7 @@ public class GameScreen extends ScreenAdapter {
     private String keyHolderId = null;
 
     private Texture texturaKey;
-
+    private float globalTime = 0f;
     // --- VARIABLES DE LA PUERTA ANIMADA ---
     private Texture texturaPuertaSheet;
     private Animation<TextureRegion> animacionPuerta;
@@ -227,6 +227,28 @@ public class GameScreen extends ScreenAdapter {
 
         // CAPA 1: LLAVE EN EL SUELO (Solo si nadie la tiene)
         if (keyHolderId == null && !keyCollected) {
+            globalTime += delta;
+
+            // Calculamos un factor de pulsación (va de 0.6 a 1.2)
+            float pulse = 0.9f + MathUtils.sin(globalTime * 4f) * 0.3f;
+
+            // --- DIBUJAR EL HALO ---
+
+            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE);
+            batch.setColor(1, 0.9f, 0, 0.5f); // Color amarillo con 50% transparencia
+
+            // Dibujamos la textura de la llave un poco más grande y centrada
+            float haloSize = keyWidth * 2.5f * pulse;
+            batch.draw(texturaKey,
+                keyX - (haloSize - keyWidth) / 2,
+                keyY - (haloSize - keyHeight) / 2,
+                haloSize, haloSize);
+
+            // Restauramos el color y el modo de mezcla normal
+            batch.setColor(Color.WHITE);
+            batch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+
+            // --- DIBUJAR LA LLAVE REAL ---
             batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
         }
 
@@ -278,8 +300,6 @@ public class GameScreen extends ScreenAdapter {
         stage.act(delta);
         stage.draw();
     }
-
-
 
     // --- GESTIÓN DE INPUTS Y UI ---
 
