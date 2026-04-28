@@ -13,7 +13,6 @@ import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
@@ -55,7 +54,13 @@ public class GameScreen extends ScreenAdapter {
     private String keyHolderId = null;
 
     private Texture texturaKey;
-    private Texture texturaPuerta;
+
+    // --- VARIABLES DE LA PUERTA ANIMADA ---
+    private Texture texturaPuertaSheet;
+    private Animation<TextureRegion> animacionPuerta;
+    private float doorStateTime = 0f;
+    private boolean puertaAbierta = false;
+
     private MapRender mapRender;
 
     private List<Texture> texturasCargadas = new ArrayList<>();
@@ -85,11 +90,10 @@ public class GameScreen extends ScreenAdapter {
 
         // 2. Carga de Texturas
         texturaKey = new Texture(Gdx.files.internal("media/skeleton_key.png"));
-        texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
-        cargarAnimaciones();
+        cargarAnimaciones(); // Aquí dentro cargamos a los jugadores y la puerta
 
         // 3. Interfaz de Usuario (Controles)
-        this.stage = new Stage(new FitViewport(800, 480)); // UI con resolución más alta para botones claros
+        this.stage = new Stage(new FitViewport(800, 480));
         Gdx.input.setInputProcessor(this.stage);
         construirUI();
 
@@ -114,7 +118,6 @@ public class GameScreen extends ScreenAdapter {
         if (data.has("door")) {
             JsonValue door = data.get("door");
             this.puertaX = door.getFloat("x", 0);
-            // Inversión Y: alto_mundo(200) - y_server - alto_puerta
             this.puertaY = 200 - door.getFloat("y", 0) - door.getFloat("height", 310);
             this.puertaWidth = door.getFloat("width", 266);
             this.puertaHeight = door.getFloat("height", 310);
@@ -130,12 +133,10 @@ public class GameScreen extends ScreenAdapter {
     public void actualizarEstado(JsonValue data) {
         if (data == null) return;
 
-        // 1. Obtenemos las dimensiones del mundo que vienen del servidor
-        // Si no vienen en el STATE_UPDATE, usa el valor de tu JSON (ej: 600)
         float worldHeightServer = 400f;
         float WORLD_HEIGHT = 400f;
 
-        // 2. Actualizar Jugadores
+        // 1. Actualizar Jugadores
         JsonValue playersJson = data.get("players");
         if (playersJson != null && playersJson.isArray()) {
             List<DatosJugador> nuevaLista = new ArrayList<>();
@@ -145,7 +146,6 @@ public class GameScreen extends ScreenAdapter {
                 float sX = pJson.getFloat("x");
                 float sY = WORLD_HEIGHT - pJson.getFloat("y") - 160;
 
-                // Buscar si el jugador ya existía
                 DatosJugador dj = null;
                 for (DatosJugador existente : jugadoresOnline) {
                     if (existente.id.equals(id)) {
@@ -160,7 +160,6 @@ public class GameScreen extends ScreenAdapter {
                     dj.x = dj.targetX = sX;
                     dj.y = dj.targetY = sY;
                 } else {
-                    // DETECCIÓN DE MOVIMIENTO Y SALTO
                     if (sX < dj.targetX) dj.mirandoIzquierda = true;
                     else if (sX > dj.targetX) dj.mirandoIzquierda = false;
 
@@ -177,33 +176,27 @@ public class GameScreen extends ScreenAdapter {
             }
             jugadoresOnline = nuevaLista;
         }
-        // 3. Actualizar Llave
+
+        // 2. Actualizar Llave
         if (data.has("key")) {
             JsonValue key = data.get("key");
             this.keyX = key.getFloat("x");
-            this.keyY = worldHeightServer - key.getFloat("y") - 32; // 32 es el alto de la llave
+            this.keyY = worldHeightServer - key.getFloat("y") - 32;
             this.keyCollected = key.getBoolean("collected", false);
         }
+
+        // 3. Actualizar Puerta
         if (data.has("door")) {
             JsonValue door = data.get("door");
             if (door.has("x") && door.has("y")) {
-                // Forzamos la puerta a entrar en pantalla para que la veas:
                 this.puertaX = door.getFloat("x");
-                // Como el log dice -390, le sumamos para subirla al suelo
                 this.puertaY = WORLD_HEIGHT - door.getFloat("y") - 80;
             }
 
-            // 4. Actualizar Puerta
-        /*if (data.has("door")) {
-            JsonValue door = data.get("door");
-            // Solo intentamos leer X e Y si el objeto los trae
-            if (door.has("x") && door.has("y")) {
-                this.puertaX = door.getFloat("x");
-                this.puertaY = worldHeightServer - door.getFloat("y") - 80;
+            // Comprobamos si el servidor nos dice que está abierta
+            if (door.has("opened")) {
+                this.puertaAbierta = door.getBoolean("opened", false);
             }
-            // opened siempre suele estar
-            this. = door.getBoolean("opened", false);
-        }*/
         }
     }
 
@@ -216,8 +209,6 @@ public class GameScreen extends ScreenAdapter {
         Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Centramos la cámara en el centro del mundo (200, 100)
-        // camara.position.set(200, 100, 0);
         camara.position.set(400, 300, 0);
         camara.update();
 
@@ -226,46 +217,39 @@ public class GameScreen extends ScreenAdapter {
 
         if (mapRender != null) mapRender.render(batch);
 
-        // 1. Dibujar Puerta
-        batch.draw(texturaPuerta, puertaX, puertaY, puertaWidth, puertaHeight);
+        // --- 1. DIBUJAR PUERTA ANIMADA ---
+        if (puertaAbierta) {
+            doorStateTime += delta; // Si está abierta, empezamos a correr la animación
+        }
+        TextureRegion currentDoorFrame = animacionPuerta.getKeyFrame(doorStateTime);
+        batch.draw(currentDoorFrame, puertaX, puertaY, puertaWidth, puertaHeight);
 
-        // Dibujar Jugadores
-// Dibujar Jugadores
+
+        // --- 2. DIBUJAR JUGADORES ---
         for (DatosJugador jugador : jugadoresOnline) {
             jugador.stateTime += delta;
 
-            // Movimiento suave
             jugador.x = MathUtils.lerp(jugador.x, jugador.targetX, 0.20f);
             jugador.y = MathUtils.lerp(jugador.y, jugador.targetY, 0.30f);
 
-            // Lógica de estado
             String animKey = (jugador.enAire) ? "jump" : (jugador.moviendose ? "run" : "idle");
 
-            // Dibujado seguro
             Animation<TextureRegion> anim = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco")).get(animKey);
             TextureRegion frame = anim.getKeyFrame(jugador.stateTime, true);
 
-            // --- EL TRUCO DEL OFFSET (Compensación) ---
             float offsetY = 0f;
-
             if (animKey.equals("run")) {
-                // Restamos píxeles para "bajar" al personaje.
-                // Prueba con -10f, -15f o -20f hasta que los pies toquen el suelo.
-                offsetY = -40f;
-            } else if (animKey.equals("jump")) {
-                // Si notas que al saltar también flota raro o se hunde, puedes ajustarlo aquí
-                offsetY = 0f;
+                offsetY = -40f; // Tu ajuste para que no flote al correr
             }
 
-            // Usamos el draw con flip incluido y le sumamos el offsetY a la posición Y
             batch.draw(frame,
-                jugador.mirandoIzquierda ? jugador.x + 112 : jugador.x, // Ajuste X por el Flip
-                jugador.y + offsetY,                                    // Ajuste Y para que no flote
-                jugador.mirandoIzquierda ? -112 : 112,                  // Ancho (Negativo hace Flip)
-                186);                                                   // Alto
+                jugador.mirandoIzquierda ? jugador.x + 112 : jugador.x,
+                jugador.y + offsetY,
+                jugador.mirandoIzquierda ? -112 : 112,
+                186);
         }
 
-        // 3. Dibujar Llave en el suelo
+        // --- 3. DIBUJAR LLAVE ---
         if (keyHolderId == null && !keyCollected) {
             batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
         }
@@ -288,6 +272,20 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void cargarAnimaciones() {
+        // --- ANIMACIÓN DE LA PUERTA ---
+        texturaPuertaSheet = new Texture(Gdx.files.internal("media/door.png"));
+        texturasCargadas.add(texturaPuertaSheet); // Lo añadimos a la lista para el dispose
+
+        // Cortamos el sprite de la puerta. Tiene 6 columnas (frames) en 1 fila
+        TextureRegion[][] doorFrames = TextureRegion.split(texturaPuertaSheet, 266, 310);
+
+        // El tiempo es 0.15f por frame (puedes ajustarlo para que abra más rápido o más lento)
+        animacionPuerta = new Animation<>(0.15f, doorFrames[0]);
+
+        // Le indicamos que solo se reproduzca una vez y se quede en el final (la puerta abierta)
+        animacionPuerta.setPlayMode(Animation.PlayMode.NORMAL);
+
+        // --- ANIMACIÓN DE LOS ESQUELETOS ---
         String[] colores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
         for (int i = 0; i < colores.length; i++) {
             Texture tex = new Texture(Gdx.files.internal("media/skeleton_color" + (i + 1) + ".png"));
@@ -296,11 +294,11 @@ public class GameScreen extends ScreenAdapter {
 
             Map<String, Animation<TextureRegion>> anims = new HashMap<>();
 
-            // IDLE: Fila 0, frames 0-3
+            // IDLE
             anims.put("idle", new Animation<>(0.2f, frames[0][0], frames[0][1], frames[0][2], frames[0][3]));
-            // JUMP: Fila 1, frames 0-5
+            // JUMP
             anims.put("jump", new Animation<>(0.12f, frames[1][0], frames[1][1], frames[1][2], frames[1][3], frames[1][4]));
-            // RUN: Fila 2, frames 0-6
+            // RUN
             anims.put("run", new Animation<>(0.1f, frames[2][0], frames[2][1], frames[2][2], frames[2][3], frames[2][4], frames[2][5], frames[2][6]));
 
             for (Animation<TextureRegion> a : anims.values()) a.setPlayMode(Animation.PlayMode.LOOP);
@@ -362,8 +360,7 @@ public class GameScreen extends ScreenAdapter {
         stage.dispose();
         skin.dispose();
         if (mapRender != null) mapRender.dispose();
-        for (Texture t : texturasCargadas) t.dispose();
+        for (Texture t : texturasCargadas) t.dispose(); // Esto borra tanto esqueletos como la puerta
         texturaKey.dispose();
-        texturaPuerta.dispose();
     }
 }
