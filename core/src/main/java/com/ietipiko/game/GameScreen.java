@@ -144,7 +144,7 @@ public class GameScreen extends ScreenAdapter {
             for (JsonValue pJson : playersJson) {
                 String id = pJson.getString("id");
                 float sX = pJson.getFloat("x");
-                float sY = WORLD_HEIGHT - pJson.getFloat("y") - 160;
+                float sY = WORLD_HEIGHT - pJson.getFloat("y") - 130;
 
                 DatosJugador dj = null;
                 for (DatosJugador existente : jugadoresOnline) {
@@ -279,23 +279,31 @@ public class GameScreen extends ScreenAdapter {
             Animation<TextureRegion> anim = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco")).get(animKey);
             TextureRegion frame = anim.getKeyFrame(jugador.stateTime, true);
 
-            float offsetY = (animKey.equals("run")) ? -40f : 0f;
+            // --- CORRECCIÓN DE POSICIÓN ---
+            // 1. Compensación por reducir la hitbox en el server (186 original - 130 nueva = 56px de diferencia)
+            // Esto evita que el personaje parezca "hundido" en el suelo.
+            float correccionHitbox = 26f;
 
-            // Dibujar esqueleto
+            // 2. Ajuste visual para la animación de correr (si tu sprite lo requiere)
+            float ajusteAnimacion = (animKey.equals("run")) ? -40f : 0f;
+
+            float finalOffsetY = correccionHitbox + ajusteAnimacion;
+
+            // Dibujar esqueleto (usamos 112 de ancho para que no se vea flaco, solo la hitbox es estrecha)
             batch.draw(frame,
                 jugador.mirandoIzquierda ? jugador.x + 112 : jugador.x,
-                jugador.y + offsetY,
+                jugador.y + finalOffsetY, // Aplicamos el offset aquí
                 jugador.mirandoIzquierda ? -112 : 112,
                 186);
 
-            // Dibujar llave sobre la cabeza (solo si este jugador es el holder)
-            if (keyHolderId != null && jugador.id.equals(keyHolderId)) {                float ajusteCorrer = animKey.equals("run") ? 40f : 0f;
-                float llaveX = jugador.x + 40; // Centrada respecto al cuerpo
-                float llaveY = jugador.y + 186 + 10 + offsetY + ajusteCorrer; // Sobre la cabeza
+            // Dibujar llave sobre la cabeza
+            if (keyHolderId != null && jugador.id.equals(keyHolderId)) {
+                float llaveX = jugador.x + 40;
+                // La llave también debe subir para compensar el hundimiento del cuerpo
+                float llaveY = jugador.y + 186 + 10 + finalOffsetY;
                 batch.draw(texturaKey, llaveX, llaveY, keyWidth, keyHeight);
             }
         }
-
         batch.end();
         stage.act(delta);
         stage.draw();
