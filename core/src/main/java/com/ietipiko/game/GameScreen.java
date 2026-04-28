@@ -36,57 +36,75 @@ public class GameScreen extends ScreenAdapter {
 
     private OrthographicCamera camara;
     private Viewport gameViewport;
-    private Texture texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
-    // INTERFAZ Y CONTROLES
+
+    // Texturas creadas en constructor (con contexto GL)
+    private Texture texturaPuerta;
+
+    // UI y controles
     private Stage stage;
     private Skin skin;
     private boolean isLeftPressed = false;
     private boolean isRightPressed = false;
     private boolean isJumpPressed = false;
-    private float puertaX, puertaY, puertaWidth, puertaHeight;
-    // MAPA
+
+    // Puerta (valores recibidos del servidor)
+    private float puertaX = 0, puertaY = 0, puertaWidth = 0, puertaHeight = 0;
+
+    // MapRender
     private MapRender mapRender;
 
-    // SISTEMA DE COLORES
+    // Animaciones: color -> (state -> Animation)
     private List<Texture> texturasCargadas = new ArrayList<>();
     private Map<String, Map<String, Animation<TextureRegion>>> animacionesPorColor = new HashMap<>();
 
+    // Jugadores
     private List<DatosJugador> jugadoresOnline = new ArrayList<>();
 
-    // CLASE DE DATOS
     private class DatosJugador {
         String id;
         String nickname;
         float x, y;
         float prevX, prevY;
         String color;
-        float stateTime = 0;
+        float stateTime = 0f;
     }
-
 
     public GameScreen(Game game, GameClient cliente) {
         this.game = game;
         this.cliente = cliente;
 
-        if (this.cliente != null) {
-            this.cliente.setPantallaJuego(this);
+        if (this.cliente != null) this.cliente.setPantallaJuego(this);
+
+        batch = new SpriteBatch();
+
+        camara = new OrthographicCamera();
+        gameViewport = new FitViewport(800, 480, camara);
+
+        stage = new Stage(new FitViewport(800, 480));
+        Gdx.input.setInputProcessor(stage);
+
+        // Crear texturas que requieren GL en constructor
+        try {
+            texturaPuerta = new Texture(Gdx.files.internal("media/door.png"));
+        } catch (Exception e) {
+            System.err.println("[GameScreen] No se pudo cargar media/door.png: " + e.getMessage());
+            texturaPuerta = null;
         }
-
-        this.batch = new SpriteBatch();
-
-        this.camara = new OrthographicCamera();
-        this.gameViewport = new FitViewport(800, 480, camara);
-
-        this.stage = new Stage(new FitViewport(800, 480));
-        Gdx.input.setInputProcessor(this.stage);
 
         cargarAnimaciones();
         construirUI();
 
-        // Cargamos el mapa
-        mapRender = new MapRender();
+        try {
+            mapRender = new MapRender();
+        } catch (Exception e) {
+            System.err.println("[GameScreen] Error inicializando MapRender: " + e.getMessage());
+            mapRender = null;
+        }
     }
 
+    /**
+     * Carga animaciones por color. Protege índices fuera de rango y crea fallbacks.
+     */
     private void cargarAnimaciones() {
         String[] nombresColores = {"blanco", "negro", "amarillo", "azul", "verde", "rojo", "turquesa", "violeta"};
         String[] archivosPng = {
@@ -101,28 +119,48 @@ public class GameScreen extends ScreenAdapter {
         };
 
         for (int i = 0; i < nombresColores.length; i++) {
-
-            Texture tex = new Texture(Gdx.files.internal(archivosPng[i]));
-            texturasCargadas.add(tex);
+            Texture tex;
+            try {
+                tex = new Texture(Gdx.files.internal(archivosPng[i]));
+                texturasCargadas.add(tex);
+            } catch (Exception e) {
+                System.err.println("[GameScreen] No se pudo cargar " + archivosPng[i] + ": " + e.getMessage());
+                continue;
+            }
 
             TextureRegion[][] frames = TextureRegion.split(tex, 112, 186);
 
-            // IDLE (frames 0–3)
-            Animation<TextureRegion> idle = new Animation<>(0.20f,
-                frames[0][0], frames[0][1], frames[0][2], frames[0][3]);
-            idle.setPlayMode(Animation.PlayMode.LOOP);
+            // IDLE (frames 0..3) con fallback
+            Animation<TextureRegion> idle;
+            try {
+                idle = new Animation<>(0.20f, frames[0][0], frames[0][1], frames[0][2], frames[0][3]);
+                idle.setPlayMode(Animation.PlayMode.LOOP);
+            } catch (Exception e) {
+                idle = new Animation<>(0.20f, frames[0][0]);
+                idle.setPlayMode(Animation.PlayMode.LOOP);
+            }
 
-            // RUN (frames 14–20)
-            Animation<TextureRegion> run = new Animation<>(0.10f,
-                frames[0][14], frames[0][15], frames[0][16],
-                frames[0][17], frames[0][18], frames[0][19], frames[0][20]);
-            run.setPlayMode(Animation.PlayMode.LOOP);
+            // RUN (frames 14..20) fallback a idle
+            Animation<TextureRegion> run;
+            try {
+                run = new Animation<>(0.10f,
+                    frames[0][14], frames[0][15], frames[0][16],
+                    frames[0][17], frames[0][18], frames[0][19], frames[0][20]);
+                run.setPlayMode(Animation.PlayMode.LOOP);
+            } catch (Exception e) {
+                run = idle;
+            }
 
-            // JUMP (frames 7–11)
-            Animation<TextureRegion> jump = new Animation<>(0.12f,
-                frames[0][7], frames[0][8], frames[0][9],
-                frames[0][10], frames[0][11]);
-            jump.setPlayMode(Animation.PlayMode.NORMAL);
+            // JUMP (frames 7..11) fallback a idle
+            Animation<TextureRegion> jump;
+            try {
+                jump = new Animation<>(0.12f,
+                    frames[0][7], frames[0][8], frames[0][9],
+                    frames[0][10], frames[0][11]);
+                jump.setPlayMode(Animation.PlayMode.NORMAL);
+            } catch (Exception e) {
+                jump = idle;
+            }
 
             Map<String, Animation<TextureRegion>> anims = new HashMap<>();
             anims.put("idle", idle);
@@ -131,32 +169,27 @@ public class GameScreen extends ScreenAdapter {
 
             animacionesPorColor.put(nombresColores[i], anims);
         }
+
+        // fallback "blanco" si no existe
+        if (!animacionesPorColor.containsKey("blanco") && !animacionesPorColor.isEmpty()) {
+            String any = animacionesPorColor.keySet().iterator().next();
+            animacionesPorColor.put("blanco", animacionesPorColor.get(any));
+        }
     }
 
-    // =========================================================
-    // Crea un botón transparente y con hitbox circular
-    // =========================================================
     private TextButton crearBotonCircular(String texto, Skin skin) {
         TextButton boton = new TextButton(texto, skin) {
             @Override
             public Actor hit(float x, float y, boolean touchable) {
-                // Calculamos si el toque del usuario está dentro del círculo
                 float radio = getWidth() / 2f;
                 float centroX = radio;
                 float centroY = getHeight() / 2f;
-
                 float distancia = (float) Math.sqrt(Math.pow(x - centroX, 2) + Math.pow(y - centroY, 2));
-
-                if (distancia <= radio) {
-                    return super.hit(x, y, touchable); // Tocó el círculo
-                }
-                return null; // Tocó la esquina vacía (ignorar)
+                if (distancia <= radio) return super.hit(x, y, touchable);
+                return null;
             }
         };
-
-        // Transparencia al 50%
         boton.getColor().a = 0.5f;
-
         return boton;
     }
 
@@ -178,7 +211,6 @@ public class GameScreen extends ScreenAdapter {
         tabla.setFillParent(true);
         tabla.bottom().padBottom(20);
 
-        // Usamos nuestro nuevo método para crear los botones
         TextButton btnIzquierda = crearBotonCircular("<", skin);
         TextButton btnDerecha = crearBotonCircular(">", skin);
         TextButton btnSalto = crearBotonCircular("SALTO", skin);
@@ -187,7 +219,6 @@ public class GameScreen extends ScreenAdapter {
         btnDerecha.addListener(crearListenerBoton("right"));
         btnSalto.addListener(crearListenerBoton("jump"));
 
-        // Ajustamos las medidas para que sean cuadradas (90x90), así el radio hace un círculo perfecto
         tabla.add(btnIzquierda).width(90).height(90).padRight(20);
         tabla.add(btnDerecha).width(90).height(90).expandX().left();
         tabla.add(btnSalto).width(90).height(90).right().padRight(20);
@@ -211,9 +242,9 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void setAccion(String accion, boolean valor) {
-        if (accion.equals("left")) isLeftPressed = valor;
-        if (accion.equals("right")) isRightPressed = valor;
-        if (accion.equals("jump")) isJumpPressed = valor;
+        if ("left".equals(accion)) isLeftPressed = valor;
+        if ("right".equals(accion)) isRightPressed = valor;
+        if ("jump".equals(accion)) isJumpPressed = valor;
     }
 
     private void enviarInput() {
@@ -226,112 +257,138 @@ public class GameScreen extends ScreenAdapter {
         }
     }
 
-    // MÉTODO CORREGIDO: Recibe el objeto "data" completo del GameClient
+    /**
+     * Actualiza jugadores y puerta. Preserva prevX/prevY para detectar movimiento.
+     */
     public void actualizarEstado(JsonValue data) {
         if (data == null) return;
 
-        // --- PARTE 1: JUGADORES ---
+        Map<String, DatosJugador> existing = new HashMap<>();
+        for (DatosJugador d : jugadoresOnline) existing.put(d.id, d);
+
+        List<DatosJugador> newList = new ArrayList<>();
         JsonValue playersJson = data.get("players");
         if (playersJson != null && playersJson.isArray()) {
-            jugadoresOnline.clear();
             for (JsonValue pJson : playersJson) {
-                // SEGURIDAD: Solo procesamos si existe el campo "id"
-                if (pJson.has("id")) {
-                    DatosJugador dj = new DatosJugador();
-                    dj.id = pJson.getString("id");
-                    dj.nickname = pJson.getString("nickname", "Anon");
-                    dj.x = pJson.getFloat("x", 0);
-                    dj.y = pJson.getFloat("y", 0);
-                    dj.color = pJson.getString("color", "blanco").toLowerCase();
-                    jugadoresOnline.add(dj);
+                if (!pJson.has("id")) continue;
+                String id = pJson.getString("id");
+                float x = pJson.getFloat("x", 0);
+                float y = pJson.getFloat("y", 0);
+                String color = pJson.getString("color", "blanco").toLowerCase();
+                String nickname = pJson.getString("nickname", "Anon");
+
+                DatosJugador dj = existing.get(id);
+                if (dj == null) {
+                    dj = new DatosJugador();
+                    dj.id = id;
+                    dj.nickname = nickname;
+                    dj.x = x;
+                    dj.y = y;
+                    dj.prevX = x;
+                    dj.prevY = y;
+                    dj.color = color;
+                    dj.stateTime = 0f;
+                } else {
+                    dj.prevX = dj.x;
+                    dj.prevY = dj.y;
+                    dj.x = x;
+                    dj.y = y;
+                    dj.nickname = nickname;
+                    dj.color = color;
                 }
+                newList.add(dj);
             }
         }
+        jugadoresOnline = newList;
 
-        // --- PUERTA ---
         JsonValue door = data.get("door");
         if (door != null) {
             this.puertaX = door.getFloat("x", 0);
             this.puertaY = door.getFloat("y", 0);
-            this.puertaWidth = door.getFloat("width", 50);
-            this.puertaHeight = door.getFloat("height", 50);
+            this.puertaWidth = door.getFloat("width", (texturaPuerta != null ? texturaPuerta.getWidth() : 50));
+            this.puertaHeight = door.getFloat("height", (texturaPuerta != null ? texturaPuerta.getHeight() : 50));
         }
-
     }
 
     private float toScreenY(float serverY, float spriteHeight) {
-        float mapHeightPixels = mapRender.getMapHeightPixels();
-        return mapHeightPixels - serverY - spriteHeight;
+        if (mapRender == null) return serverY;
+        return mapRender.getMapHeightPixels() - serverY - spriteHeight;
     }
 
     @Override
     public void render(float delta) {
-        enviarInput();
+        try {
+            enviarInput();
 
-        Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+            Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
+            Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
-        camara.update();
+            camara.position.set(camara.viewportWidth / 2f, (camara.viewportHeight / 2f) - 80, 0);
+            camara.update();
 
-        batch.setProjectionMatrix(camara.combined);
+            batch.setProjectionMatrix(camara.combined);
 
-        batch.begin();
+            batch.begin();
 
-        if (mapRender != null) {
-            mapRender.render(batch);
-        }
+            if (mapRender != null) mapRender.render(batch);
 
-        for (DatosJugador jugador : jugadoresOnline) {
-
-            jugador.stateTime += delta;
-
-            float dx = jugador.x - jugador.prevX;
-            float dy = jugador.y - jugador.prevY;
-
-            String anim = "idle";
-
-            if (Math.abs(dy) > 1f) {
-                anim = "jump";
-            } else if (Math.abs(dx) > 1f) {
-                anim = "run";
+            if (texturaPuerta != null && puertaWidth > 0 && puertaHeight > 0) {
+                float drawDoorY = toScreenY(puertaY, puertaHeight);
+                batch.draw(texturaPuerta, puertaX, drawDoorY, puertaWidth, puertaHeight);
             }
 
-            Animation<TextureRegion> animation =
-                animacionesPorColor.get(jugador.color).get(anim);
+            for (DatosJugador jugador : jugadoresOnline) {
+                jugador.stateTime += delta;
 
-            TextureRegion frame = animation.getKeyFrame(jugador.stateTime);
+                float dx = jugador.x - jugador.prevX;
+                float dy = jugador.y - jugador.prevY;
 
-            float drawY = toScreenY(jugador.y, frame.getRegionHeight());
-            batch.draw(frame, jugador.x, drawY);
+                String anim = "idle";
+                if (Math.abs(dy) > 1f) anim = "jump";
+                else if (Math.abs(dx) > 1f) anim = "run";
 
-            // actualizar prevX/prevY
-            jugador.prevX = jugador.x;
-            jugador.prevY = jugador.y;
+                Map<String, Animation<TextureRegion>> animMap = animacionesPorColor.get(jugador.color);
+                if (animMap == null) animMap = animacionesPorColor.get("blanco");
+                if (animMap == null) continue;
+
+                Animation<TextureRegion> animation = animMap.get(anim);
+                if (animation == null) animation = animMap.get("idle");
+                if (animation == null) continue;
+
+                TextureRegion frame = animation.getKeyFrame(jugador.stateTime, true);
+
+                float drawY = toScreenY(jugador.y, frame.getRegionHeight());
+                batch.draw(frame, jugador.x, drawY);
+
+                jugador.prevX = jugador.x;
+                jugador.prevY = jugador.y;
+            }
+
+            batch.end();
+
+            stage.act(delta);
+            stage.draw();
+        } catch (Exception e) {
+            System.err.println("[GameScreen] Exception in render: " + e.getMessage());
+            e.printStackTrace();
         }
-
-
-        batch.end();
-
-        stage.act(delta);
-        stage.draw();
     }
 
     @Override
     public void resize(int width, int height) {
-        gameViewport.update(width, height, true); // El 'true' centra la cámara temporalmente
+        gameViewport.update(width, height, true);
         stage.getViewport().update(width, height, true);
     }
 
     @Override
     public void dispose() {
-        batch.dispose();
-        stage.dispose();
+        try { batch.dispose(); } catch (Exception ignored) {}
+        try { stage.dispose(); } catch (Exception ignored) {}
         if (skin != null) skin.dispose();
         if (mapRender != null) mapRender.dispose();
-
+        if (texturaPuerta != null) try { texturaPuerta.dispose(); } catch (Exception ignored) {}
         for (Texture tex : texturasCargadas) {
-            tex.dispose();
+            try { tex.dispose(); } catch (Exception ignored) {}
         }
     }
 }
