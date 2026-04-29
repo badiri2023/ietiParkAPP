@@ -144,7 +144,7 @@ public class GameScreen extends ScreenAdapter {
             for (JsonValue pJson : playersJson) {
                 String id = pJson.getString("id");
                 float sX = pJson.getFloat("x");
-                float sY = WORLD_HEIGHT - pJson.getFloat("y") - 130;
+                float sY = WORLD_HEIGHT - pJson.getFloat("y") - 90;
 
                 DatosJugador dj = null;
                 for (DatosJugador existente : jugadoresOnline) {
@@ -299,7 +299,10 @@ public class GameScreen extends ScreenAdapter {
             if (keyHolderId != null && jugador.id.equals(keyHolderId)) {
                 float llaveX = jugador.x + 40;
                 // La llave también debe subir para compensar el hundimiento del cuerpo
-                float llaveY = jugador.y + 186 + 10 + finalOffsetY;
+                float llaveY = jugador.y + 140 + finalOffsetY;
+                if (animKey.equals("run")) {
+                    llaveY += 35f;
+                }
                 batch.draw(texturaKey, llaveX, llaveY, keyWidth, keyHeight);
             }
         }
