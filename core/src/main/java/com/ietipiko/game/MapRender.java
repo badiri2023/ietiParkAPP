@@ -23,12 +23,13 @@ public class MapRender {
     private int tileWidth;
     private int tileHeight;
 
-    public MapRender() {
+    public MapRender(int levelIndex) {
         FileHandle file = Gdx.files.internal("game_data.json");
         JsonReader reader = new JsonReader();
         JsonValue base = reader.parse(file);
 
-        JsonValue level = base.get("levels").get(0);
+        // Ahora lee el nivel que le pidamos
+        JsonValue level = base.get("levels").get(levelIndex);
         JsonValue layers = level.get("layers");
 
         for (int i = 0; i < layers.size; i++) {

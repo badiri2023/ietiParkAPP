@@ -62,7 +62,7 @@ public class GameScreen extends ScreenAdapter {
     private boolean puertaAbierta = false;
 
     private MapRender mapRender;
-
+    private int levelIndex;
     private List<Texture> texturasCargadas = new ArrayList<>();
     private Map<String, Map<String, Animation<TextureRegion>>> animacionesPorColor = new HashMap<>();
     private List<DatosJugador> jugadoresOnline = new ArrayList<>();
@@ -79,7 +79,7 @@ public class GameScreen extends ScreenAdapter {
         boolean mirandoIzquierda = false;
     }
 
-    public GameScreen(Game game, GameClient cliente, JsonValue initialData) {
+    public GameScreen(Game game, GameClient cliente, JsonValue initialData, int levelIndex) {
         this.game = game;
         this.cliente = cliente;
 
@@ -90,15 +90,15 @@ public class GameScreen extends ScreenAdapter {
 
         // 2. Carga de Texturas
         texturaKey = new Texture(Gdx.files.internal("media/skeleton_key.png"));
-        cargarAnimaciones(); // Aquí dentro cargamos a los jugadores y la puerta
+        cargarAnimaciones();
 
         // 3. Interfaz de Usuario (Controles)
         this.stage = new Stage(new FitViewport(800, 480));
         Gdx.input.setInputProcessor(this.stage);
         construirUI();
-
+        this.levelIndex = levelIndex;
         // 4. Inicializar Mapa y Datos
-        mapRender = new MapRender();
+        mapRender = new MapRender(this.levelIndex);
 
         if (this.cliente != null) {
             this.cliente.setPantallaJuego(this);

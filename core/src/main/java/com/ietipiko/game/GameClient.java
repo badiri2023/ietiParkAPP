@@ -15,6 +15,9 @@ public class GameClient extends WebSocketClient {
     private GameScreen pantallaJuego;
     private JsonReader jsonReader = new JsonReader();
 
+    // Aquí guardamos por qué nivel vamos (0 = el primero)
+    private int currentLevel = 0;
+
     public GameClient(URI serverUri, LoginScreen pantallaLogin, Game game) {
         super(serverUri);
         this.pantallaLogin = pantallaLogin;
@@ -36,7 +39,6 @@ public class GameClient extends WebSocketClient {
             JsonValue json = jsonReader.parse(message);
             String type = json.getString("type");
 
-            // 1. RECIBIR EL ESTADO DEL JUEGO (Posiciones y Colores)
             switch (type) {
                 case "STATE_UPDATE":
                     final JsonValue stateData = json.get("data");
@@ -44,14 +46,37 @@ public class GameClient extends WebSocketClient {
                         if (pantallaJuego != null) pantallaJuego.actualizarEstado(stateData);
                     });
                     break;
+
                 case "WORLD_INIT":
                     final JsonValue initData = json.get("data");
                     Gdx.app.postRunnable(() -> {
-                        GameScreen nuevaPantalla = new GameScreen(game, this, initData);
+                        // CAMBIO 1: Le pasamos 'currentLevel' al crear el GameScreen
+                        GameScreen nuevaPantalla = new GameScreen(game, this, initData, currentLevel);
                         this.pantallaJuego = nuevaPantalla;
                         game.setScreen(nuevaPantalla);
                     });
                     break;
+
+                // CAMBIO 2: AÑADIMOS EL EVENTO DE CAMBIO DE NIVEL
+                case "LEVEL_COMPLETED":
+                    currentLevel++; // Subimos un nivel (pasa a valer 1)
+
+                    Gdx.app.postRunnable(() -> {
+                        if (pantallaJuego != null) {
+                            pantallaJuego.dispose(); // Borramos el mapa viejo
+                        }
+
+                        // Creamos la nueva pantalla para el nivel 1
+                        GameScreen nuevaPantalla = new GameScreen(game, GameClient.this, null, currentLevel);
+
+                        this.pantallaJuego = nuevaPantalla;
+                        game.setScreen(nuevaPantalla);
+
+                        System.out.println("¡Pasando al nivel " + currentLevel + "!");
+                    });
+                    break;
+                // ------------------------------------------------
+
                 case "PLAYER_LIST":
                     final JsonValue listData = json.get("data");
                     final String[] nombres = new String[listData.size];
