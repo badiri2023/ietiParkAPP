@@ -57,17 +57,20 @@ public class GameClient extends WebSocketClient {
                     });
                     break;
 
-                // CAMBIO 2: AÑADIMOS EL EVENTO DE CAMBIO DE NIVEL
-                case "LEVEL_COMPLETED":
-                    currentLevel++; // Subimos un nivel (pasa a valer 1)
+                case "CHANGE_LEVEL":
+                    currentLevel++;
+
+                    // Extraemos los datos del nuevo nivel (si el servidor los envía)
+                    final JsonValue changeData = json.get("data");
+                    final JsonValue newWorldData = changeData != null && changeData.has("world") ? changeData.get("world") : null;
 
                     Gdx.app.postRunnable(() -> {
                         if (pantallaJuego != null) {
                             pantallaJuego.dispose(); // Borramos el mapa viejo
                         }
 
-                        // Creamos la nueva pantalla para el nivel 1
-                        GameScreen nuevaPantalla = new GameScreen(game, GameClient.this, null, currentLevel);
+                        // Creamos la nueva pantalla para el nivel 1 (pasando los nuevos datos)
+                        GameScreen nuevaPantalla = new GameScreen(game, GameClient.this, newWorldData, currentLevel);
 
                         this.pantallaJuego = nuevaPantalla;
                         game.setScreen(nuevaPantalla);
@@ -75,6 +78,7 @@ public class GameClient extends WebSocketClient {
                         System.out.println("¡Pasando al nivel " + currentLevel + "!");
                     });
                     break;
+                // ------------------------------------------------
                 // ------------------------------------------------
 
                 case "PLAYER_LIST":

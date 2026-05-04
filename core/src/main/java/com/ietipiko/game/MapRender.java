@@ -69,7 +69,6 @@ public class MapRender {
             }
             tileMaps.add(tileMap);
 
-            // Guardamos el tamaño total del mapa (basado en la primera capa)
             if (i == 0) {
                 mapWidth = width;
                 mapHeight = height;

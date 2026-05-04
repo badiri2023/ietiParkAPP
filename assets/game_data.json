@@ -48,7 +48,7 @@
           "type": "player1",
           "animationId": "anim_1776697186675083",
           "x": 114,
-          "y": 390,
+          "y": 389,
           "width": 112,
           "height": 186,
           "imageFile": "media/skeleton_color1.png",
@@ -67,6 +67,36 @@
           "width": 266,
           "height": 310,
           "imageFile": "media/door.png",
+          "flipX": false,
+          "flipY": false,
+          "depth": 0.0,
+          "groupId": "__main__"
+        },
+        {
+          "name": "key",
+          "gameplayData": "",
+          "type": "key",
+          "animationId": "anim_1777305199392731",
+          "x": 387,
+          "y": 302,
+          "width": 32,
+          "height": 32,
+          "imageFile": "media/skeleton_key.png",
+          "flipX": false,
+          "flipY": false,
+          "depth": 0.0,
+          "groupId": "__main__"
+        },
+        {
+          "name": "player2",
+          "gameplayData": "",
+          "type": "player2",
+          "animationId": "anim_1776699907386002",
+          "x": 178,
+          "y": 388,
+          "width": 112,
+          "height": 186,
+          "imageFile": "media/skeleton_color8.png",
           "flipX": false,
           "flipY": false,
           "depth": 0.0,
@@ -92,6 +122,114 @@
       "depthSensitivity": 0.08,
       "zonesFile": "zones/level_000_zones.json",
       "pathsFile": "paths/level_000_paths.json"
+    },
+    {
+      "name": "level2",
+      "description": "",
+      "gameplayData": "",
+      "layers": [
+        {
+          "name": "suelo",
+          "gameplayData": "",
+          "x": 0,
+          "y": 0,
+          "depth": 0.0,
+          "tilesSheetFile": "media/TileSetMap_Png.png",
+          "tilesWidth": 16,
+          "tilesHeight": 16,
+          "visible": true,
+          "groupId": "__main__",
+          "tileMapFile": "tilemaps/level_001_layer_000.json"
+        }
+      ],
+      "layerGroups": [
+        {
+          "id": "__main__",
+          "name": "Main",
+          "collapsed": false
+        }
+      ],
+      "sprites": [
+        {
+          "name": "player1",
+          "gameplayData": "",
+          "type": "player1",
+          "animationId": "anim_1776697186675083",
+          "x": 121,
+          "y": 339,
+          "width": 112,
+          "height": 186,
+          "imageFile": "media/skeleton_color1.png",
+          "flipX": false,
+          "flipY": false,
+          "depth": 0.0,
+          "groupId": "__main__"
+        },
+        {
+          "name": "door",
+          "gameplayData": "",
+          "type": "door",
+          "animationId": "anim_1776701483295954",
+          "x": 1276,
+          "y": 208,
+          "width": 266,
+          "height": 310,
+          "imageFile": "media/door.png",
+          "flipX": false,
+          "flipY": false,
+          "depth": 0.0,
+          "groupId": "__main__"
+        },
+        {
+          "name": "key",
+          "gameplayData": "",
+          "type": "key",
+          "animationId": "anim_1777305199392731",
+          "x": 1079,
+          "y": 141,
+          "width": 32,
+          "height": 32,
+          "imageFile": "media/skeleton_key.png",
+          "flipX": false,
+          "flipY": false,
+          "depth": 0.0,
+          "groupId": "__main__"
+        },
+        {
+          "name": "palanca",
+          "gameplayData": "",
+          "type": "palanca",
+          "animationId": "anim_1777665588350292",
+          "x": 991,
+          "y": 361,
+          "width": 32,
+          "height": 32,
+          "imageFile": "media/assets_dungeon.png",
+          "flipX": false,
+          "flipY": false,
+          "depth": 0.0,
+          "groupId": "__main__"
+        }
+      ],
+      "spriteGroups": [
+        {
+          "id": "__main__",
+          "name": "Main",
+          "collapsed": false
+        }
+      ],
+      "groupId": "__main__",
+      "viewportWidth": 320,
+      "viewportHeight": 180,
+      "viewportX": 0,
+      "viewportY": 0,
+      "viewportAdaptation": "letterbox",
+      "viewportInitialColor": "green",
+      "viewportPreviewColor": "blue",
+      "backgroundColorHex": "#33335E",
+      "depthSensitivity": 0.08,
+      "zonesFile": "zones/level_001_zones.json",
+      "pathsFile": "paths/level_001_paths.json"
     }
   ],
   "levelGroups": [
@@ -132,7 +270,7 @@
     {
       "name": "skeleton_key",
       "fileName": "media/skeleton_key.png",
-      "mediaType": "tileset",
+      "mediaType": "spritesheet",
       "tileWidth": 32,
       "tileHeight": 32,
       "selectionColorHex": "#FFCC00",
@@ -218,6 +356,15 @@
       "tileHeight": 186,
       "selectionColorHex": "#FFCC00",
       "groupId": "__main__"
+    },
+    {
+      "name": "assets_dungeon",
+      "fileName": "media/assets_dungeon.png",
+      "mediaType": "spritesheet",
+      "tileWidth": 32,
+      "tileHeight": 32,
+      "selectionColorHex": "#FFCC00",
+      "groupId": "__main__"
     }
   ],
   "mediaGroups": [
@@ -243,6 +390,18 @@
     {
       "name": "exitdoor",
       "color": "green"
+    },
+    {
+      "name": "precipicio",
+      "color": "pink"
+    },
+    {
+      "name": "palanca",
+      "color": "indigo"
+    },
+    {
+      "name": "plataforma",
+      "color": "purple"
     }
   ],
   "animationsFile": "animations/animations.json"
