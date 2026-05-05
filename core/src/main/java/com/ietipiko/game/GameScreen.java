@@ -41,7 +41,7 @@ public class GameScreen extends ScreenAdapter {
 
     private Stage stage;
     private Skin skin;
-    // --- CONSTANTES PARA CLEAN CODE ---
+
     private static final float CAMERA_LERP_SPEED = 0.1f;
     private static final float PUERTA_ESCALA_X = 0.60f;
     private static final float PUERTA_ESCALA_Y = 0.75f; // Antes tenías 1.2 en render y 0.7 en el server
@@ -93,23 +93,18 @@ public class GameScreen extends ScreenAdapter {
         boolean mirandoIzquierda = false;
     }
 
-    // CONSTRUCTOR SECUNDARIO: Usado por LoginScreen para iniciar en el Nivel 0
-    public GameScreen(Game game, GameClient cliente) {
-        this(game, cliente, null, 0);
-    }
-
     // CONSTRUCTOR PRINCIPAL
     public GameScreen(Game game, GameClient cliente, JsonValue initialData, int levelIndex) {
         this.game = game;
         this.cliente = cliente;
         this.levelIndex = levelIndex;
 
-        // 1. Configuración de Cámara y Viewport
+        // Configuración de Cámara y Viewport
         this.camara = new OrthographicCamera();
         this.gameViewport = new FitViewport(800, WORLD_HEIGHT, camara);
         this.batch = new SpriteBatch();
 
-        // 2. Carga de Texturas
+        // Carga de Texturas
         texturaKey = new Texture(Gdx.files.internal("media/skeleton_key.png"));
         cargarAnimaciones();
 
@@ -119,19 +114,18 @@ public class GameScreen extends ScreenAdapter {
         palancaOff = regions[1][0];
         palancaOn = regions[1][1];
 
-        // 3. Interfaz de Usuario (Controles)
+        // cONTROLES
         this.stage = new Stage(new FitViewport(800, 480));
         Gdx.input.setInputProcessor(this.stage);
         construirUI();
 
-        // 4. Inicializar Mapa y Datos
+        // Inicializar Mapa y Datos
         mapRender = new MapRender(this.levelIndex);
 
         if (this.cliente != null) {
             this.cliente.setPantallaJuego(this);
         }
 
-        // Si tenemos datos iniciales del mundo (WORLD_INIT), los cargamos ya
         if (initialData != null) {
             inicializarMundo(initialData);
         }
@@ -142,7 +136,6 @@ public class GameScreen extends ScreenAdapter {
     public void inicializarMundo(JsonValue data) {
         if (data == null) return;
 
-        // Corregido: Usamos WORLD_HEIGHT (600) para calcular las posiciones, no '200'
         if (data.has("door")) {
             JsonValue door = data.get("door");
             this.puertaX = door.getFloat("x", 0);
@@ -160,17 +153,15 @@ public class GameScreen extends ScreenAdapter {
 
     public void actualizarEstado(JsonValue data) {
         if (data == null) return;
-// --- NUEVO: Sincronización de altura dinámica ---
         if (data.has("worldHeight")) {
             float nuevaAltura = data.getFloat("worldHeight");
             if (nuevaAltura != WORLD_HEIGHT) {
                 WORLD_HEIGHT = nuevaAltura;
-                // Actualizamos el viewport y la cámara para el nuevo tamaño
                 gameViewport.setWorldSize(800, WORLD_HEIGHT);
                 camara.position.set(400, WORLD_HEIGHT / 2f, 0);
             }
         }
-        // 1. Actualizar Jugadores
+        // Jugadores
         JsonValue playersJson = data.get("players");
         if (playersJson != null && playersJson.isArray()) {
             List<DatosJugador> nuevaLista = new ArrayList<>();
@@ -212,7 +203,7 @@ public class GameScreen extends ScreenAdapter {
             jugadoresOnline = nuevaLista;
         }
 
-// 2. Actualizar Llave
+        // Llave
         if (data.has("key")) {
             JsonValue key = data.get("key");
             this.keyX = key.getFloat("x", 0);
@@ -231,7 +222,7 @@ public class GameScreen extends ScreenAdapter {
             }
         }
 
-        // 3. Actualizar Puerta
+        // Puerta
         if (data.has("door")) {
             JsonValue door = data.get("door");
             if (door.has("x") && door.has("y")) {
@@ -247,7 +238,7 @@ public class GameScreen extends ScreenAdapter {
             }
         }
 
-        // 4. Actualizar Palanca
+        // Palanca
         if (data.has("palanca")) {
             JsonValue palancaData = data.get("palanca");
             if (palancaData != null && !palancaData.isNull()) {
@@ -256,18 +247,13 @@ public class GameScreen extends ScreenAdapter {
                 palancaWidth = palancaData.getFloat("width", 32f);
                 palancaHeight = palancaData.getFloat("height", 32f);
                 isPalancaActivated = palancaData.getBoolean("activated", false);
-
-                // Invertimos la Y de la palanca
                 this.palancaY = convertirY(palancaData.getFloat("y"), palancaHeight);
             }
         } else {
             palancaVisible = false;
         }
     }
-
-    /**
-     * Convierte la coordenada Y del servidor a la Y de LibGDX usando la altura REAL del TiledMap.
-     */
+    // AJUSTAR POSICION
     private float convertirY(float serverY, float alturaVisualElemento) {
         if (mapRender == null) return 0f;
         float mapHeight = mapRender.getMapHeightPixels();
@@ -275,20 +261,20 @@ public class GameScreen extends ScreenAdapter {
     }
 
 
-    // --- RENDERIZADO ---
+    // RENDERIZADO +
 
     @Override
     public void render(float delta) {
         enviarInput();
 
-        // --- 0. ACTUALIZAR POSICIONES (LERP) ANTES DE LA CÁMARA ---
+        // ACTUALIZAR POSICIONES
         for (DatosJugador jugador : jugadoresOnline) {
             jugador.stateTime += delta;
             jugador.x = MathUtils.lerp(jugador.x, jugador.targetX, 0.20f);
             jugador.y = MathUtils.lerp(jugador.y, jugador.targetY, 0.30f);
         }
 
-        // --- 1. LÓGICA DE SEGUIMIENTO DE CÁMARA ---
+        // CAMARA
         float targetCamX = 400;
         float targetCamY = 240;
 
@@ -299,20 +285,25 @@ public class GameScreen extends ScreenAdapter {
                 break;
             }
         }
-
         if (mapRender != null) {
             float mapW = mapRender.getMapWidthPixels();
             float mapH = mapRender.getMapHeightPixels();
             float halfViewW = camara.viewportWidth / 2f;
             float halfViewH = camara.viewportHeight / 2f;
-
-            targetCamX = MathUtils.clamp(targetCamX, halfViewW, mapW - halfViewW);
-            targetCamY = MathUtils.clamp(targetCamY, halfViewH, mapH - halfViewH);
+            if (camara.viewportWidth < mapW) {
+                targetCamX = MathUtils.clamp(targetCamX, halfViewW, mapW - halfViewW);
+            } else {
+                targetCamX = mapW / 2f;
+            }
+            if (camara.viewportHeight < mapH) {
+                targetCamY = MathUtils.clamp(targetCamY, halfViewH, mapH - halfViewH);
+            } else {
+                targetCamY = mapH / 2f;
+            }
         }
 
         camara.position.set(targetCamX, targetCamY, 0);
         camara.update();
-        // ------------------------------------------
 
         Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -320,10 +311,10 @@ public class GameScreen extends ScreenAdapter {
         batch.setProjectionMatrix(camara.combined);
         batch.begin();
 
-        // CAPA 1: EL MAPA (Se dibuja primero para que quede de fondo)
+        // EL MAPA
         if (mapRender != null) mapRender.render(batch);
 
-        // CAPA 2: LLAVE EN EL SUELO
+        // LLAVE EN EL SUELO
         if (keyHolderId == null && !keyCollected) {
             globalTime += delta;
             float pulse = 0.9f + MathUtils.sin(globalTime * 4f) * 0.3f;
@@ -341,11 +332,18 @@ public class GameScreen extends ScreenAdapter {
             batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
         }
 
-        // CAPA 3: LA PALANCA
+//LA PALANCA
         if (palancaVisible) {
             TextureRegion palancaActual = isPalancaActivated ? palancaOn : palancaOff;
-            //ajustar altura d ela palanca
-            batch.draw(palancaActual, palancaX, palancaY+30, palancaWidth, palancaHeight);
+
+            float offsetPalancaY =0f;
+            float offsetPalancaX = 0f;
+
+            batch.draw(palancaActual,
+                palancaX + offsetPalancaX,
+                palancaY + offsetPalancaY,
+                palancaWidth,
+                palancaHeight);
         }
 
 // CAPA 4: LA PUERTA (Lo que tienes puesto ahora)

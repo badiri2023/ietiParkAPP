@@ -172,13 +172,6 @@ public class LoginScreen extends ScreenAdapter {
         }
     }
 
-    /*public void irAlJuego() {
-        Gdx.app.postRunnable(() -> {
-            if (dialogoActual != null) dialogoActual.remove();
-            game.setScreen(new GameScreen(game, cliente));
-        });
-    }*/
-
     public void mostrarDialogoCarga(String titulo, String mensaje) {
         if (dialogoActual != null) dialogoActual.remove();
 

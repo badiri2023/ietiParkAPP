@@ -9,16 +9,12 @@ import org.java_websocket.handshake.ServerHandshake;
 import java.net.URI;
 
 public class GameClient extends WebSocketClient {
-    private Game game;
 
+    private Game game;
     private LoginScreen pantallaLogin;
     private GameScreen pantallaJuego;
     private JsonReader jsonReader = new JsonReader();
-
-    // Aquí guardamos por qué nivel vamos (0 = el primero)
     private int currentLevel = 0;
-
-    // --- CAMBIO 1: Añadimos la variable para guardar tu ID ---
     private String myId = null;
 
     public GameClient(URI serverUri, LoginScreen pantallaLogin, Game game) {
@@ -27,7 +23,6 @@ public class GameClient extends WebSocketClient {
         this.game = game;
     }
 
-    // --- CAMBIO 2: Añadimos este método para que GameScreen lo pueda leer ---
     public String getMyId() {
         return this.myId;
     }
@@ -96,7 +91,6 @@ public class GameClient extends WebSocketClient {
                     break;
 
                 case "WELCOME":
-                    // --- CAMBIO 3: Guardamos la ID que nos envía el servidor al conectarnos ---
                     this.myId = json.getString("id");
                     System.out.println("Servidor: Bienvenido. Mi ID asignada es: " + this.myId);
                     break;

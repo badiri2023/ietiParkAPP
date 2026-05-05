@@ -1,4 +1,4 @@
-package com.ietipiko.game; // IMPORTANTE: Cambia esto por tu paquete real si es distinto
+package com.ietipiko.game;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.files.FileHandle;
@@ -76,12 +76,8 @@ public class MapRender {
         }
     }
 
-    /**
-     * Este método se llama unas 60 veces por segundo desde tu GameScreen
-     * para dibujar el escenario en la pantalla.
-     */
     public void render(SpriteBatch batch) {
-        // Dibujamos una capa detrás de otra (primero el suelo, luego los muros...)
+        // Dibujamos una capa detrás de otra (primero el suelo, luego los muros)
         for (int layerIndex = 0; layerIndex < tileMaps.size(); layerIndex++) {
             int[][] tileMap = tileMaps.get(layerIndex);
             TextureRegion[][] tileRegions = tileRegionsList.get(layerIndex);
@@ -110,9 +106,6 @@ public class MapRender {
         }
     }
 
-    /**
-     * MUY IMPORTANTE: Libera la memoria de la tarjeta gráfica cuando cerremos el juego
-     */
     public void dispose() {
         for (Texture tileset : tilesets) {
             if (tileset != null) {
@@ -121,7 +114,10 @@ public class MapRender {
         }
     }
 
-    // Getters por si necesitas saber el tamaño del mapa en tu GameScreen
-    public float getMapWidthPixels() { return this.mapWidth * tileWidth; }
-    public float getMapHeightPixels() { return this.mapHeight * tileHeight; }
+    public float getMapWidthPixels() {
+        return this.mapWidth * tileWidth;
+    }
+    public float getMapHeightPixels() {
+        return this.mapHeight * tileHeight;
+    }
 }
