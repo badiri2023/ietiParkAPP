@@ -30,7 +30,7 @@ import java.util.Map;
 
 public class GameScreen extends ScreenAdapter {
 
-    public static float WORLD_HEIGHT = 480f;
+    public static float WORLD_HEIGHT = 600f;
 
     private Game game;
     private GameClient cliente;
@@ -41,7 +41,10 @@ public class GameScreen extends ScreenAdapter {
 
     private Stage stage;
     private Skin skin;
-
+    // --- CONSTANTES PARA CLEAN CODE ---
+    private static final float CAMERA_LERP_SPEED = 0.1f;
+    private static final float PUERTA_ESCALA_X = 0.7f;
+    private static final float PUERTA_ESCALA_Y = 1.2f; // Antes tenías 1.2 en render y 0.7 en el server
     // Estados de entrada
     private boolean isLeftPressed = false;
     private boolean isRightPressed = false;
@@ -171,13 +174,11 @@ public class GameScreen extends ScreenAdapter {
         JsonValue playersJson = data.get("players");
         if (playersJson != null && playersJson.isArray()) {
             List<DatosJugador> nuevaLista = new ArrayList<>();
-
             for (JsonValue pJson : playersJson) {
                 String id = pJson.getString("id");
                 float sX = pJson.getFloat("x");
 
-                float sY = WORLD_HEIGHT - pJson.getFloat("y") - 90f;
-
+                float sY = convertirY(pJson.getFloat("y"), 90f);
                 DatosJugador dj = null;
                 for (DatosJugador existente : jugadoresOnline) {
                     if (existente.id.equals(id)) {
@@ -216,7 +217,7 @@ public class GameScreen extends ScreenAdapter {
             JsonValue key = data.get("key");
             this.keyX = key.getFloat("x", 0);
             // Restamos 32 (su alto) para que la base de la llave toque el suelo
-            this.keyY = WORLD_HEIGHT - key.getFloat("y", 0) - 32;
+            this.keyY = convertirY(key.getFloat("y", 0), keyHeight); // Usamos la función
             this.keyCollected = key.getBoolean("collected", false);
 
             JsonValue holder = key.get("holderId");
@@ -234,8 +235,8 @@ public class GameScreen extends ScreenAdapter {
                 this.puertaX = door.getFloat("x");
                 // La puerta mide 310 y tú usas escala 0.7 en el render (310 * 0.7 = 217)
                 // Restamos 217 para que la base de la puerta esté en el suelo
-                float altoPuertaVisual = 217f;
-                this.puertaY = WORLD_HEIGHT - door.getFloat("y") - altoPuertaVisual;
+                float altoPuertaVisual = this.puertaHeight * PUERTA_ESCALA_Y;
+                this.puertaY = convertirY(door.getFloat("y"), altoPuertaVisual);
             }
 
             if (door.has("opened")) {
@@ -254,28 +255,72 @@ public class GameScreen extends ScreenAdapter {
                 isPalancaActivated = palancaData.getBoolean("activated", false);
 
                 // Invertimos la Y de la palanca
-                palancaY = WORLD_HEIGHT - palancaData.getFloat("y") - palancaHeight;
+                this.palancaY = convertirY(palancaData.getFloat("y"), palancaHeight);
             }
         } else {
             palancaVisible = false;
         }
     }
+
+    /**
+     * Convierte la coordenada Y del servidor a la Y de LibGDX usando la altura REAL del TiledMap.
+     */
+    private float convertirY(float serverY, float alturaVisualElemento) {
+        if (mapRender == null) return 0f;
+        float mapHeight = mapRender.getMapHeightPixels();
+        return mapHeight - serverY - alturaVisualElemento;
+    }
+
+
     // --- RENDERIZADO ---
 
     @Override
     public void render(float delta) {
         enviarInput();
 
+        // --- 0. ACTUALIZAR POSICIONES (LERP) ANTES DE LA CÁMARA ---
+        for (DatosJugador jugador : jugadoresOnline) {
+            jugador.stateTime += delta;
+            jugador.x = MathUtils.lerp(jugador.x, jugador.targetX, 0.20f);
+            jugador.y = MathUtils.lerp(jugador.y, jugador.targetY, 0.30f);
+        }
+
+        // --- 1. LÓGICA DE SEGUIMIENTO DE CÁMARA ---
+        float targetCamX = 400;
+        float targetCamY = 240;
+
+        for (DatosJugador p : jugadoresOnline) {
+            if (cliente != null && cliente.getMyId() != null && cliente.getMyId().equals(p.id)) {
+                targetCamX = p.x + (30f / 2f);
+                targetCamY = p.y + (90f / 2f);
+                break;
+            }
+        }
+
+        if (mapRender != null) {
+            float mapW = mapRender.getMapWidthPixels();
+            float mapH = mapRender.getMapHeightPixels();
+            float halfViewW = camara.viewportWidth / 2f;
+            float halfViewH = camara.viewportHeight / 2f;
+
+            targetCamX = MathUtils.clamp(targetCamX, halfViewW, mapW - halfViewW);
+            targetCamY = MathUtils.clamp(targetCamY, halfViewH, mapH - halfViewH);
+        }
+
+        camara.position.set(targetCamX, targetCamY, 0);
+        camara.update();
+        // ------------------------------------------
+
         Gdx.gl.glClearColor(0.03f, 0.04f, 0.06f, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-        camara.position.set(400, 240, 0);
-        camara.update();
 
         batch.setProjectionMatrix(camara.combined);
         batch.begin();
 
-        // CAPA 1: LLAVE EN EL SUELO
+        // CAPA 1: EL MAPA (Se dibuja primero para que quede de fondo)
+        if (mapRender != null) mapRender.render(batch);
+
+        // CAPA 2: LLAVE EN EL SUELO
         if (keyHolderId == null && !keyCollected) {
             globalTime += delta;
             float pulse = 0.9f + MathUtils.sin(globalTime * 4f) * 0.3f;
@@ -293,36 +338,26 @@ public class GameScreen extends ScreenAdapter {
             batch.draw(texturaKey, keyX, keyY, keyWidth, keyHeight);
         }
 
-        // CAPA 2: EL MAPA
-        if (mapRender != null) mapRender.render(batch);
-
         // CAPA 3: LA PALANCA
         if (palancaVisible) {
             TextureRegion palancaActual = isPalancaActivated ? palancaOn : palancaOff;
             batch.draw(palancaActual, palancaX, palancaY, palancaWidth, palancaHeight);
         }
 
-        // CAPA 4: LA PUERTA
+// CAPA 4: LA PUERTA
         if (puertaAbierta) {
             doorStateTime += delta;
         }
         TextureRegion currentDoorFrame = animacionPuerta.getKeyFrame(doorStateTime);
-
-        float escalaX = 0.7f;
-        float escalaY = 1.2f; // <--- ¡AQUÍ! Si aumentas este número, la puerta se estira hacia arriba
-        float anchoEscalado = puertaWidth * escalaX;
-        float altoEscalado = puertaHeight * escalaY;
+        float anchoEscalado = puertaWidth * PUERTA_ESCALA_X;
+        float altoEscalado = puertaHeight * PUERTA_ESCALA_Y;
         float offsetPuertaX = -40f;
 
         batch.draw(currentDoorFrame, puertaX + offsetPuertaX, puertaY, anchoEscalado, altoEscalado);
 
+
         // CAPA 5: JUGADORES
         for (DatosJugador jugador : jugadoresOnline) {
-            jugador.stateTime += delta;
-
-            jugador.x = MathUtils.lerp(jugador.x, jugador.targetX, 0.20f);
-            jugador.y = MathUtils.lerp(jugador.y, jugador.targetY, 0.30f);
-
             String animKey = (jugador.enAire) ? "jump" : (jugador.moviendose ? "run" : "idle");
             Animation<TextureRegion> anim = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco")).get(animKey);
             TextureRegion frame = anim.getKeyFrame(jugador.stateTime, true);
@@ -348,6 +383,8 @@ public class GameScreen extends ScreenAdapter {
             }
         }
         batch.end();
+
+        // UI
         stage.act(delta);
         stage.draw();
     }

@@ -18,10 +18,18 @@ public class GameClient extends WebSocketClient {
     // Aquí guardamos por qué nivel vamos (0 = el primero)
     private int currentLevel = 0;
 
+    // --- CAMBIO 1: Añadimos la variable para guardar tu ID ---
+    private String myId = null;
+
     public GameClient(URI serverUri, LoginScreen pantallaLogin, Game game) {
         super(serverUri);
         this.pantallaLogin = pantallaLogin;
         this.game = game;
+    }
+
+    // --- CAMBIO 2: Añadimos este método para que GameScreen lo pueda leer ---
+    public String getMyId() {
+        return this.myId;
     }
 
     public void setPantallaJuego(GameScreen pantallaJuego) {
@@ -50,7 +58,6 @@ public class GameClient extends WebSocketClient {
                 case "WORLD_INIT":
                     final JsonValue initData = json.get("data");
                     Gdx.app.postRunnable(() -> {
-                        // CAMBIO 1: Le pasamos 'currentLevel' al crear el GameScreen
                         GameScreen nuevaPantalla = new GameScreen(game, this, initData, currentLevel);
                         this.pantallaJuego = nuevaPantalla;
                         game.setScreen(nuevaPantalla);
@@ -60,16 +67,14 @@ public class GameClient extends WebSocketClient {
                 case "CHANGE_LEVEL":
                     currentLevel++;
 
-                    // Extraemos los datos del nuevo nivel (si el servidor los envía)
                     final JsonValue changeData = json.get("data");
                     final JsonValue newWorldData = changeData != null && changeData.has("world") ? changeData.get("world") : null;
 
                     Gdx.app.postRunnable(() -> {
                         if (pantallaJuego != null) {
-                            pantallaJuego.dispose(); // Borramos el mapa viejo
+                            pantallaJuego.dispose();
                         }
 
-                        // Creamos la nueva pantalla para el nivel 1 (pasando los nuevos datos)
                         GameScreen nuevaPantalla = new GameScreen(game, GameClient.this, newWorldData, currentLevel);
 
                         this.pantallaJuego = nuevaPantalla;
@@ -78,8 +83,6 @@ public class GameClient extends WebSocketClient {
                         System.out.println("¡Pasando al nivel " + currentLevel + "!");
                     });
                     break;
-                // ------------------------------------------------
-                // ------------------------------------------------
 
                 case "PLAYER_LIST":
                     final JsonValue listData = json.get("data");
@@ -93,7 +96,9 @@ public class GameClient extends WebSocketClient {
                     break;
 
                 case "WELCOME":
-                    System.out.println("Servidor: Bienvenido.");
+                    // --- CAMBIO 3: Guardamos la ID que nos envía el servidor al conectarnos ---
+                    this.myId = json.getString("id");
+                    System.out.println("Servidor: Bienvenido. Mi ID asignada es: " + this.myId);
                     break;
 
                 default:
