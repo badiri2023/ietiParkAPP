@@ -212,12 +212,15 @@ public class GameScreen extends ScreenAdapter {
             jugadoresOnline = nuevaLista;
         }
 
-        // 2. Actualizar Llave
+// 2. Actualizar Llave
         if (data.has("key")) {
             JsonValue key = data.get("key");
             this.keyX = key.getFloat("x", 0);
-            // Restamos 32 (su alto) para que la base de la llave toque el suelo
-            this.keyY = convertirY(key.getFloat("y", 0), keyHeight); // Usamos la función
+
+            // CORRECCIÓN: Usar la altura de la hitbox que manda el servidor
+            float hitboxLlaveServer = key.getFloat("height", 32f);
+            this.keyY = convertirY(key.getFloat("y", 0), hitboxLlaveServer);
+
             this.keyCollected = key.getBoolean("collected", false);
 
             JsonValue holder = key.get("holderId");
@@ -233,10 +236,10 @@ public class GameScreen extends ScreenAdapter {
             JsonValue door = data.get("door");
             if (door.has("x") && door.has("y")) {
                 this.puertaX = door.getFloat("x");
-                // La puerta mide 310 y tú usas escala 0.7 en el render (310 * 0.7 = 217)
-                // Restamos 217 para que la base de la puerta esté en el suelo
-                float altoPuertaVisual = this.puertaHeight * PUERTA_ESCALA_Y;
-                this.puertaY = convertirY(door.getFloat("y"), altoPuertaVisual);
+
+                // CORRECCIÓN: Usar la altura de colisión del servidor, NO la visual escalada
+                float hitboxPuertaServer = door.getFloat("height", 310f);
+                this.puertaY = convertirY(door.getFloat("y"), hitboxPuertaServer);
             }
 
             if (door.has("opened")) {
@@ -356,29 +359,52 @@ public class GameScreen extends ScreenAdapter {
         batch.draw(currentDoorFrame, puertaX + offsetPuertaX, puertaY, anchoEscalado, altoEscalado);
 
 
-        // CAPA 5: JUGADORES
+// CAPA 5: JUGADORES
+// CAPA 5: JUGADORES
         for (DatosJugador jugador : jugadoresOnline) {
             String animKey = (jugador.enAire) ? "jump" : (jugador.moviendose ? "run" : "idle");
             Animation<TextureRegion> anim = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco")).get(animKey);
             TextureRegion frame = anim.getKeyFrame(jugador.stateTime, true);
 
-            float correccionHitbox = 26f;
-            float ajusteAnimacion = (animKey.equals("run")) ? -40f : 0f;
-            float finalOffsetY = correccionHitbox + ajusteAnimacion;
+            // --- 1. AJUSTE EJE X (Corregir el desplazamiento a la derecha) ---
+            // Tu imagen mide 112 pero tu colisión real (hitbox) mide 30.
+            // Restamos 41 para centrar el dibujo sobre la colisión invisible.
+            float offsetX = 41f;
+            float drawX = jugador.x - offsetX;
+
+            if (jugador.mirandoIzquierda) {
+                // Al invertir el dibujo (ancho negativo), ajustamos el punto de anclaje
+                drawX = jugador.x + 112 - offsetX;
+            }
+
+            // --- 2. AJUSTE EJE Y (Quitar la levitación base y la levitación al correr) ---
+            // Valor negativo para empujar el dibujo hacia abajo y que los pies pisen la línea de la colisión
+            float offsetY = -20f;
+
+            if (animKey.equals("run")) {
+                // El frame de correr del artista levita un poco más, así que lo hundimos unos píxeles extra
+                offsetY -= 0f;
+            }
 
             batch.draw(frame,
-                jugador.mirandoIzquierda ? jugador.x + 112 : jugador.x,
-                jugador.y + finalOffsetY,
+                drawX,
+                jugador.y + offsetY,
                 jugador.mirandoIzquierda ? -112 : 112,
                 186);
 
-            // Llave sobre la cabeza
+            // --- 3. DIBUJAR LLAVE SOBRE LA CABEZA ---
             if (keyHolderId != null && jugador.id.equals(keyHolderId)) {
-                float llaveX = jugador.x + 40;
-                float llaveY = jugador.y + 140 + finalOffsetY;
+                // Centramos la llave respecto a la colisión real (30px), no a la imagen de 112px
+                float llaveX = jugador.x - 1f;
+
+                // Colocamos la llave justo encima de la cabeza real (altura 90) + un pequeño margen de 15px
+                float llaveY = jugador.y + 90f + 15f;
+
+                // Si el personaje está corriendo (se agacha visualmente), bajamos la llave para que le siga
                 if (animKey.equals("run")) {
-                    llaveY += 35f;
+                    llaveY -= 5f;
                 }
+
                 batch.draw(texturaKey, llaveX, llaveY, keyWidth, keyHeight);
             }
         }
