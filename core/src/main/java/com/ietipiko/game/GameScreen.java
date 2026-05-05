@@ -344,7 +344,8 @@ public class GameScreen extends ScreenAdapter {
         // CAPA 3: LA PALANCA
         if (palancaVisible) {
             TextureRegion palancaActual = isPalancaActivated ? palancaOn : palancaOff;
-            batch.draw(palancaActual, palancaX, palancaY, palancaWidth, palancaHeight);
+            //ajustar altura d ela palanca
+            batch.draw(palancaActual, palancaX, palancaY+30, palancaWidth, palancaHeight);
         }
 
 // CAPA 4: LA PUERTA (Lo que tienes puesto ahora)
