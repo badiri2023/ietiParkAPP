@@ -24,34 +24,40 @@ public class MapRender {
     private int tileHeight;
 
     public MapRender() {
+        // 1. CARGAMOS EL "ÍNDICE" (game_data.json)
         FileHandle file = Gdx.files.internal("game_data.json");
         JsonReader reader = new JsonReader();
         JsonValue base = reader.parse(file);
 
+        // 2. BUSCAMOS LAS CAPAS DEL PRIMER NIVEL
         JsonValue level = base.get("levels").get(0);
         JsonValue layers = level.get("layers");
 
+        // 3. RECORREMOS CADA CAPA (Ej: la capa "suelo" y la capa "juego")
         for (int i = 0; i < layers.size; i++) {
             JsonValue layer = layers.get(i);
 
+            // -- A. Cargar la imagen (Tileset) --
             String tilesSheetFile = layer.getString("tilesSheetFile");
             Texture tileset = new Texture(Gdx.files.internal(tilesSheetFile));
             tilesets.add(tileset);
 
-
+            // -- B. Recortar la imagen en cuadraditos (16x16) --
             tileWidth = layer.getInt("tilesWidth");
             tileHeight = layer.getInt("tilesHeight");
             TextureRegion[][] regions = TextureRegion.split(tileset, tileWidth, tileHeight);
             tileRegionsList.add(regions);
 
-
+            // -- C. LEER LA MATRIZ DEL MAPA DESDE EL ARCHIVO EXTERNO --
             String tileMapFileName = layer.getString("tileMapFile");
             FileHandle mapFile = Gdx.files.internal(tileMapFileName);
 
             // Leemos el archivo JSON del mapa (ej. level_000_layer_000.json)
             JsonValue archivoCompleto = reader.parse(mapFile);
 
-
+            // ==========================================================
+            // SOLUCIÓN AL CRASHEO: Sacamos solo el array "tileMap"
+            // ==========================================================
             JsonValue tileMapJson = archivoCompleto.get("tileMap");
 
             // Calculamos el alto y ancho de la matriz
@@ -66,7 +72,7 @@ public class MapRender {
                     tileMap[y][x] = fila.getInt(x);
                 }
             }
-            tileMaps.add(tileMap);
+            tileMaps.add(tileMap); // Guardamos la matriz de esta capa
 
             // Guardamos el tamaño total del mapa (basado en la primera capa)
             if (i == 0) {

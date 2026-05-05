@@ -1,0 +1,121 @@
+{
+  "zoneGroups": [
+    {
+      "id": "__main__",
+      "name": "Main",
+      "collapsed": false
+    }
+  ],
+  "zones": [
+    {
+      "name": "suelo",
+      "type": "Default",
+      "gameplayData": "",
+      "x": 0,
+      "y": 0,
+      "width": 32,
+      "height": 384,
+      "color": "cyan",
+      "groupId": "__main__"
+    },
+    {
+      "name": "suelo",
+      "type": "Default",
+      "gameplayData": "",
+      "x": 1410,
+      "y": 0,
+      "width": 29,
+      "height": 374,
+      "color": "cyan",
+      "groupId": "__main__"
+    },
+    {
+      "name": "suelo",
+      "type": "Default",
+      "gameplayData": "",
+      "x": 0,
+      "y": 384,
+      "width": 448,
+      "height": 96,
+      "color": "cyan",
+      "groupId": "__main__"
+    },
+    {
+      "name": "suelo",
+      "type": "Default",
+      "gameplayData": "",
+      "x": 896,
+      "y": 369,
+      "width": 542,
+      "height": 120,
+      "color": "cyan",
+      "groupId": "__main__"
+    },
+    {
+      "name": "door",
+      "type": "exitdoor",
+      "gameplayData": "",
+      "x": 1294,
+      "y": 322,
+      "width": 116,
+      "height": 48,
+      "color": "green",
+      "groupId": "__main__"
+    },
+    {
+      "name": "spawn",
+      "type": "spawn",
+      "gameplayData": "",
+      "x": 71,
+      "y": 178,
+      "width": 135,
+      "height": 54,
+      "color": "yellow",
+      "groupId": "__main__"
+    },
+    {
+      "name": "key",
+      "type": "key",
+      "gameplayData": "",
+      "x": 1070,
+      "y": 127,
+      "width": 50,
+      "height": 50,
+      "color": "red",
+      "groupId": "__main__"
+    },
+    {
+      "name": "precipicio",
+      "type": "precipicio",
+      "gameplayData": "",
+      "x": 448,
+      "y": 424,
+      "width": 450,
+      "height": 58,
+      "color": "pink",
+      "groupId": "__main__"
+    },
+    {
+      "name": "palanca",
+      "type": "Default",
+      "gameplayData": "",
+      "x": 981,
+      "y": 340,
+      "width": 47,
+      "height": 33,
+      "color": "cyan",
+      "groupId": "__main__"
+    },
+    {
+      "name": "Zone 10",
+      "type": "plataforma",
+      "gameplayData": "",
+      "x": 704,
+      "y": 321,
+      "width": 111,
+      "height": 32,
+      "color": "purple",
+      "groupId": "__main__"
+    }
+  ]
+}
