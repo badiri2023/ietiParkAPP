@@ -43,8 +43,8 @@ public class GameScreen extends ScreenAdapter {
     private Skin skin;
     // --- CONSTANTES PARA CLEAN CODE ---
     private static final float CAMERA_LERP_SPEED = 0.1f;
-    private static final float PUERTA_ESCALA_X = 0.7f;
-    private static final float PUERTA_ESCALA_Y = 1.2f; // Antes tenías 1.2 en render y 0.7 en el server
+    private static final float PUERTA_ESCALA_X = 0.60f;
+    private static final float PUERTA_ESCALA_Y = 0.75f; // Antes tenías 1.2 en render y 0.7 en el server
     // Estados de entrada
     private boolean isLeftPressed = false;
     private boolean isRightPressed = false;
@@ -347,7 +347,7 @@ public class GameScreen extends ScreenAdapter {
             batch.draw(palancaActual, palancaX, palancaY, palancaWidth, palancaHeight);
         }
 
-// CAPA 4: LA PUERTA
+// CAPA 4: LA PUERTA (Lo que tienes puesto ahora)
         if (puertaAbierta) {
             doorStateTime += delta;
         }
@@ -355,35 +355,30 @@ public class GameScreen extends ScreenAdapter {
         float anchoEscalado = puertaWidth * PUERTA_ESCALA_X;
         float altoEscalado = puertaHeight * PUERTA_ESCALA_Y;
         float offsetPuertaX = -40f;
+        float offsetPuertaY = 155f;
+        batch.draw(currentDoorFrame,
+            puertaX + offsetPuertaX,
+            puertaY + offsetPuertaY,
+            anchoEscalado,
+            altoEscalado);
 
-        batch.draw(currentDoorFrame, puertaX + offsetPuertaX, puertaY, anchoEscalado, altoEscalado);
 
-
-// CAPA 5: JUGADORES
-// CAPA 5: JUGADORES
+        // CAPA 5: JUGADORES
         for (DatosJugador jugador : jugadoresOnline) {
             String animKey = (jugador.enAire) ? "jump" : (jugador.moviendose ? "run" : "idle");
             Animation<TextureRegion> anim = animacionesPorColor.getOrDefault(jugador.color, animacionesPorColor.get("blanco")).get(animKey);
             TextureRegion frame = anim.getKeyFrame(jugador.stateTime, true);
 
-            // --- 1. AJUSTE EJE X (Corregir el desplazamiento a la derecha) ---
-            // Tu imagen mide 112 pero tu colisión real (hitbox) mide 30.
-            // Restamos 41 para centrar el dibujo sobre la colisión invisible.
             float offsetX = 41f;
             float drawX = jugador.x - offsetX;
 
             if (jugador.mirandoIzquierda) {
-                // Al invertir el dibujo (ancho negativo), ajustamos el punto de anclaje
                 drawX = jugador.x + 112 - offsetX;
             }
-
-            // --- 2. AJUSTE EJE Y (Quitar la levitación base y la levitación al correr) ---
-            // Valor negativo para empujar el dibujo hacia abajo y que los pies pisen la línea de la colisión
             float offsetY = -20f;
 
             if (animKey.equals("run")) {
-                // El frame de correr del artista levita un poco más, así que lo hundimos unos píxeles extra
-                offsetY -= 0f;
+                offsetY -= 35f;
             }
 
             batch.draw(frame,
@@ -392,15 +387,9 @@ public class GameScreen extends ScreenAdapter {
                 jugador.mirandoIzquierda ? -112 : 112,
                 186);
 
-            // --- 3. DIBUJAR LLAVE SOBRE LA CABEZA ---
             if (keyHolderId != null && jugador.id.equals(keyHolderId)) {
-                // Centramos la llave respecto a la colisión real (30px), no a la imagen de 112px
                 float llaveX = jugador.x - 1f;
-
-                // Colocamos la llave justo encima de la cabeza real (altura 90) + un pequeño margen de 15px
                 float llaveY = jugador.y + 90f + 15f;
-
-                // Si el personaje está corriendo (se agacha visualmente), bajamos la llave para que le siga
                 if (animKey.equals("run")) {
                     llaveY -= 5f;
                 }

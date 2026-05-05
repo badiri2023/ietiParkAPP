@@ -402,6 +402,18 @@
     {
       "name": "plataforma",
       "color": "purple"
+    },
+    {
+      "name": "plataformaactivable",
+      "color": "deepOrange"
+    },
+    {
+      "name": "Category 9",
+      "color": "red"
+    },
+    {
+      "name": "Category 10",
+      "color": "red"
     }
   ],
   "animationsFile": "animations/animations.json"

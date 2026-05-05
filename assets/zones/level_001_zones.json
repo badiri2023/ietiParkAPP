@@ -107,14 +107,25 @@
       "groupId": "__main__"
     },
     {
-      "name": "Zone 10",
+      "name": "plataforma",
       "type": "plataforma",
       "gameplayData": "",
-      "x": 704,
+      "x": 657,
       "y": 321,
-      "width": 111,
-      "height": 32,
+      "width": 162,
+      "height": 31,
       "color": "purple",
+      "groupId": "__main__"
+    },
+    {
+      "name": "plataformaactivable",
+      "type": "plataformaactivable",
+      "gameplayData": "",
+      "x": 496,
+      "y": 321,
+      "width": 113,
+      "height": 30,
+      "color": "deepOrange",
       "groupId": "__main__"
     }
   ]
